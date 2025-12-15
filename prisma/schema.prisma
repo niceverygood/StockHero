@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String?  @unique
+  name      String?
+  isPremium Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Symbol {
+  id        String   @id @default(cuid())
+  symbol    String   @unique
+  name      String
+  market    String
+  sector    String?
+  updatedAt DateTime @updatedAt
+
+  debates     DebateSession[]
+  predictions Prediction[]
+}
+
+model DebateSession {
+  id        String   @id @default(cuid())
+  symbolId  String
+  date      String
+  status    String   @default("draft")
+  createdAt DateTime @default(now())
+
+  symbol   Symbol          @relation(fields: [symbolId], references: [id])
+  messages DebateMessage[]
+
+  @@unique([symbolId, date])
+}
+
+model DebateMessage {
+  id        String   @id @default(cuid())
+  sessionId String
+  role      String
+  content   String   @db.Text
+  sources   Json?
+  score     Int?
+  risks     String?  @db.Text
+  createdAt DateTime @default(now())
+
+  session DebateSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model Verdict {
+  id        String   @id @default(cuid())
+  date      String   @unique
+  top5      Json
+  rationale String?  @db.Text
+  createdAt DateTime @default(now())
+}
+
+model Prediction {
+  id                 String   @id @default(cuid())
+  date               String
+  symbolId           String
+  horizonDays        Int
+  predictedDirection String
+  confidence         Float
+  createdAt          DateTime @default(now())
+
+  symbol  Symbol   @relation(fields: [symbolId], references: [id])
+  outcome Outcome?
+
+  @@unique([date, symbolId, horizonDays])
+}
+
+model Outcome {
+  id             String   @id @default(cuid())
+  predictionId   String   @unique
+  realizedReturn Float
+  isHit          Boolean
+  evaluatedAt    DateTime @default(now())
+
+  prediction Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+}
+
+model PremiumReport {
+  id          String   @id @default(cuid())
+  date        String
+  title       String
+  summaryFree String   @db.Text
+  contentPaid String?  @db.Text
+  isLocked    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
