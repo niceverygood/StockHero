@@ -67,16 +67,48 @@ export function AIConsultation({ characterType, holdings = [], onClose, onViewDe
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isTypingGreeting, setIsTypingGreeting] = useState(true);
+  const [displayedGreeting, setDisplayedGreeting] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const typingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 첫 인사 메시지 타이핑 효과
+  useEffect(() => {
+    const greeting = persona.greeting;
+    let currentIndex = 0;
+    
+    setDisplayedGreeting('');
+    setIsTypingGreeting(true);
+    
+    typingIntervalRef.current = setInterval(() => {
+      if (currentIndex < greeting.length) {
+        setDisplayedGreeting(greeting.substring(0, currentIndex + 1));
+        currentIndex++;
+      } else {
+        if (typingIntervalRef.current) {
+          clearInterval(typingIntervalRef.current);
+        }
+        setIsTypingGreeting(false);
+      }
+    }, 25); // 25ms per character
+    
+    return () => {
+      if (typingIntervalRef.current) {
+        clearInterval(typingIntervalRef.current);
+      }
+    };
+  }, [persona.greeting]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, displayedGreeting]);
 
   useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+    if (!isTypingGreeting) {
+      inputRef.current?.focus();
+    }
+  }, [isTypingGreeting]);
 
   async function handleSend() {
     if (!input.trim() || isLoading) return;
@@ -186,37 +218,49 @@ export function AIConsultation({ characterType, holdings = [], onClose, onViewDe
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
-          >
-            {message.role === 'assistant' && (
-              <CharacterAvatar character={characterType} size="md" />
-            )}
+        {messages.map((message) => {
+          const isGreeting = message.id === 'greeting';
+          const displayContent = isGreeting ? displayedGreeting : message.content;
+          
+          return (
             <div
-              className={`max-w-[80%] p-3 rounded-2xl ${
-                message.role === 'user'
-                  ? 'bg-brand-500 text-white rounded-br-sm'
-                  : `${char.bgColor} text-dark-200 rounded-bl-sm`
-              }`}
+              key={message.id}
+              className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
             >
-              <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
-              <div className={`text-xs mt-1 ${
-                message.role === 'user' ? 'text-brand-200' : 'text-dark-500'
-              }`}>
-                {message.timestamp.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+              {message.role === 'assistant' && (
+                <CharacterAvatar character={characterType} size="md" />
+              )}
+              <div
+                className={`max-w-[80%] p-3 rounded-2xl ${
+                  message.role === 'user'
+                    ? 'bg-brand-500 text-white rounded-br-sm'
+                    : `${char.bgColor} text-dark-200 rounded-bl-sm`
+                }`}
+              >
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                  {displayContent}
+                  {isGreeting && isTypingGreeting && (
+                    <span className="inline-block w-0.5 h-4 bg-dark-300 ml-0.5 animate-pulse" />
+                  )}
+                </p>
+                {(!isGreeting || !isTypingGreeting) && (
+                  <div className={`text-xs mt-1 ${
+                    message.role === 'user' ? 'text-brand-200' : 'text-dark-500'
+                  }`}>
+                    {message.timestamp.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                )}
               </div>
+              {message.role === 'user' && (
+                <div className="w-10 h-10 rounded-xl bg-dark-700 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-dark-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+              )}
             </div>
-            {message.role === 'user' && (
-              <div className="w-10 h-10 rounded-xl bg-dark-700 flex items-center justify-center">
-                <svg className="w-5 h-5 text-dark-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
         
         {isLoading && (
           <div className="flex gap-3">
@@ -235,7 +279,7 @@ export function AIConsultation({ characterType, holdings = [], onClose, onViewDe
       </div>
 
       {/* Suggested Questions - Character specific */}
-      {messages.length === 1 && (
+      {messages.length === 1 && !isTypingGreeting && (
         <div className="px-4 pb-2">
           <div className="text-xs text-dark-500 mb-2">추천 질문</div>
           <div className="flex flex-wrap gap-2">
@@ -275,16 +319,17 @@ export function AIConsultation({ characterType, holdings = [], onClose, onViewDe
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={`${char.name}에게 질문하세요...`}
+            placeholder={isTypingGreeting ? '잠시만 기다려주세요...' : `${char.name}에게 질문하세요...`}
             rows={1}
-            className="flex-1 px-4 py-3 rounded-xl bg-dark-800 border border-dark-700 text-dark-100 placeholder-dark-500 resize-none focus:outline-none focus:border-brand-500 transition-colors"
+            disabled={isTypingGreeting}
+            className={`flex-1 px-4 py-3 rounded-xl bg-dark-800 border border-dark-700 text-dark-100 placeholder-dark-500 resize-none focus:outline-none focus:border-brand-500 transition-colors ${isTypingGreeting ? 'opacity-50 cursor-not-allowed' : ''}`}
             style={{ minHeight: '48px', maxHeight: '120px' }}
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || isTypingGreeting}
             className={`px-4 rounded-xl font-medium transition-colors ${
-              input.trim() && !isLoading
+              input.trim() && !isLoading && !isTypingGreeting
                 ? 'bg-brand-500 text-white hover:bg-brand-600'
                 : 'bg-dark-800 text-dark-600 cursor-not-allowed'
             }`}
