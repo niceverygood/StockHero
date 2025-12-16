@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { CharacterAvatar } from '@/components/CharacterAvatar';
+import { DisclaimerBar, Header } from '@/components';
 
 // 히어로 메타 데이터
 const HERO_META = {
@@ -105,8 +106,11 @@ export default function HeroDetailPage() {
   if (!meta) return null;
   
   return (
-    <div className="min-h-screen bg-dark-950 pt-32 pb-20">
-      <div className="container-app">
+    <>
+      <DisclaimerBar />
+      <Header />
+      <main className="min-h-screen bg-dark-950 pt-24 sm:pt-28 lg:pt-32 pb-20">
+        <div className="container-app">
         {/* Back Button */}
         <Link
           href="/heroes"
@@ -362,8 +366,10 @@ export default function HeroDetailPage() {
               ))}
           </div>
         </div>
-      </div>
-    </div>
+        </div>
+      </main>
+      <DisclaimerBar variant="bottom" compact />
+    </>
   );
 }
 
