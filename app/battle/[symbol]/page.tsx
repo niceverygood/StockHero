@@ -87,7 +87,19 @@ const SYMBOL_MAP: Record<string, { name: string; sector: string; price: number }
   '035420': { name: 'NAVER', sector: 'IT Service', price: 192000 },
   '051910': { name: 'LG화학', sector: 'Chemical', price: 298000 },
   '000270': { name: '기아', sector: 'Auto', price: 94800 },
+  '105560': { name: 'KB금융', sector: 'Finance', price: 78500 },
+  '017670': { name: 'SK텔레콤', sector: 'Telecom', price: 53200 },
+  '068270': { name: '셀트리온', sector: 'Bio', price: 178500 },
 };
+
+interface RealTimeStockInfo {
+  name: string;
+  sector: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  isRealTime: boolean;
+}
 
 function ChatBubble({ 
   message, 
@@ -475,7 +487,7 @@ function FinalConsensusSummary({
 export default function BattlePage() {
   const params = useParams();
   const symbol = params.symbol as string;
-  const symbolInfo = SYMBOL_MAP[symbol] || { name: symbol, sector: 'Unknown', price: 70000 };
+  const baseSymbolInfo = SYMBOL_MAP[symbol] || { name: symbol, sector: 'Unknown', price: 70000 };
   const { recordDebateView } = useDebateHistory();
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -490,9 +502,47 @@ export default function BattlePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [targets, setTargets] = useState<TargetInfo[]>([]);
   const [consultCharacter, setConsultCharacter] = useState<CharacterType | null>(null);
+  const [realTimeInfo, setRealTimeInfo] = useState<RealTimeStockInfo | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const processedMessageIds = useRef<Set<string>>(new Set()); // 이미 처리된 메시지 ID 추적
   const generatingRoundRef = useRef<number | null>(null); // 현재 생성 중인 라운드 추적
+
+  // 실시간 주가 정보
+  const symbolInfo = realTimeInfo || {
+    ...baseSymbolInfo,
+    change: 0,
+    changePercent: 0,
+    isRealTime: false,
+  };
+
+  // 실시간 주가 조회
+  useEffect(() => {
+    async function fetchRealTimePrice() {
+      try {
+        const res = await fetch(`/api/stock/price?symbol=${symbol}`);
+        const data = await res.json();
+        
+        if (data.success && data.data) {
+          setRealTimeInfo({
+            name: data.data.name || baseSymbolInfo.name,
+            sector: baseSymbolInfo.sector,
+            price: data.data.price,
+            change: data.data.change || 0,
+            changePercent: data.data.changePercent || 0,
+            isRealTime: data.source === 'kis',
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch real-time price:', error);
+      }
+    }
+    
+    fetchRealTimePrice();
+    
+    // 30초마다 갱신
+    const interval = setInterval(fetchRealTimePrice, 30000);
+    return () => clearInterval(interval);
+  }, [symbol, baseSymbolInfo.name, baseSymbolInfo.sector]);
 
   // 다음 메시지 표시 처리
   const processNextMessage = useCallback(() => {
@@ -695,12 +745,23 @@ export default function BattlePage() {
                     </div>
                     <div>
                       <h1 className="text-xl font-bold text-dark-50">{symbolInfo.name}</h1>
-                      <div className="flex items-center gap-2 text-sm">
+                      <div className="flex items-center gap-2 text-sm flex-wrap">
                         <span className="text-dark-500 font-mono">{symbol}</span>
                         <span className="text-dark-600">|</span>
                         <span className="text-dark-500">{symbolInfo.sector}</span>
                         <span className="text-dark-600">|</span>
                         <span className="text-brand-400 font-semibold">{symbolInfo.price.toLocaleString()}원</span>
+                        {symbolInfo.change !== 0 && (
+                          <span className={`font-medium ${symbolInfo.change > 0 ? 'text-red-400' : 'text-blue-400'}`}>
+                            {symbolInfo.change > 0 ? '▲' : '▼'} {Math.abs(symbolInfo.changePercent).toFixed(2)}%
+                          </span>
+                        )}
+                        {symbolInfo.isRealTime && (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 text-xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                            실시간
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

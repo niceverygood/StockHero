@@ -1,32 +1,30 @@
-import { Suspense } from 'react';
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { DisclaimerBar, Header, SkeletonList } from '@/components';
-import type { Top5Item } from '@/lib/types';
 
-async function getVerdict(): Promise<{
-  top5: Top5Item[];
+interface Top5Item {
+  rank: number;
+  symbolId: string;
+  symbol: string;
+  name: string;
+  avgScore: number;
   rationale: string;
-  date: string;
-  unanimousCount: number;
-}> {
-  const today = new Date().toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  unanimous: boolean;
+  currentPrice: number;
+  change: number;
+  changePercent: number;
+}
 
-  return {
-    date: today,
-    unanimousCount: 2,
-    rationale: 'Top 5 중 2개 종목이 만장일치 합의를 얻었습니다. 반도체, 2차전지, IT서비스 업종에 대한 선호가 두드러집니다.',
-    top5: [
-      { rank: 1, symbolId: '1', symbol: '005930', name: '삼성전자', avgScore: 4.7, rationale: '세 분석가 모두 삼성전자에 대해 4점 이상의 긍정적 평가를 내렸습니다.' },
-      { rank: 2, symbolId: '2', symbol: '000660', name: 'SK하이닉스', avgScore: 4.5, rationale: 'HBM 수요 증가에 따른 수혜가 예상됩니다.' },
-      { rank: 3, symbolId: '3', symbol: '373220', name: 'LG에너지솔루션', avgScore: 4.3, rationale: '2차전지 업종 내 글로벌 경쟁력을 갖추고 있습니다.' },
-      { rank: 4, symbolId: '7', symbol: '035720', name: '카카오', avgScore: 4.2, rationale: 'IT서비스 업종 내 플랫폼 경쟁력이 있습니다.' },
-      { rank: 5, symbolId: '10', symbol: '068270', name: '셀트리온', avgScore: 4.1, rationale: '바이오시밀러 시장 점유율 확대가 긍정적입니다.' },
-    ],
-  };
+interface VerdictData {
+  success: boolean;
+  isRealTime: boolean;
+  date: string;
+  time: string;
+  unanimousCount: number;
+  rationale: string;
+  top5: Top5Item[];
 }
 
 function RankBadge({ rank }: { rank: number }) {
@@ -57,109 +55,41 @@ function ScoreBar({ score }: { score: number }) {
   );
 }
 
-async function VerdictContent() {
-  const verdict = await getVerdict();
-
+function PriceChange({ change, changePercent }: { change: number; changePercent: number }) {
+  if (change === 0) return null;
+  
+  const isUp = change > 0;
   return (
-    <div className="grid lg:grid-cols-3 gap-6 lg:gap-8">
-      <div className="lg:col-span-2 space-y-3 sm:space-y-4">
-        {verdict.top5.map((item, index) => (
-          <Link key={item.symbolId} href={`/battle/${item.symbol}`}>
-            <div className="card-interactive group">
-              <div className="flex items-center gap-3 sm:gap-4">
-                {/* Rank Badge */}
-                <RankBadge rank={index + 1} />
-                
-                {/* Stock Info */}
-                <div className="flex-1 min-w-0 overflow-hidden">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mb-1.5 sm:mb-2">
-                    <span className="text-base sm:text-lg font-semibold text-dark-100 group-hover:text-white transition-colors truncate max-w-full">
-                      {item.name}
-                    </span>
-                    <span className="text-xs sm:text-sm text-dark-500 font-mono shrink-0">{item.symbol}</span>
-                    {index < 2 && (
-                      <span className="badge-success text-2xs shrink-0">Unanimous</span>
-                    )}
-                  </div>
-                  <ScoreBar score={item.avgScore} />
-                  <p className="mt-2 sm:mt-3 text-xs sm:text-sm text-dark-400 line-clamp-1">
-                    {item.rationale}
-                  </p>
-                </div>
-                
-                {/* Arrow */}
-                <div className="shrink-0 text-dark-600 group-hover:text-brand-400 transition-colors">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-          </Link>
-        ))}
-
-        {/* Summary Card */}
-        <div className="card mt-8">
-          <div className="flex items-center gap-2 mb-4">
-            <svg className="w-5 h-5 text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <h3 className="font-semibold text-dark-100">Consensus Summary</h3>
-          </div>
-          <p className="text-dark-400 text-sm leading-relaxed mb-4">
-            {verdict.rationale}
-          </p>
-          <div className="flex items-center gap-6 pt-4 border-t border-dark-800">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold text-dark-100">{verdict.unanimousCount}</span>
-              <span className="text-sm text-dark-500">Unanimous</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold text-dark-100">20</span>
-              <span className="text-sm text-dark-500">Candidates</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Sidebar */}
-      <div className="space-y-6">
-        <div className="card">
-          <h3 className="font-semibold text-dark-100 mb-4 flex items-center gap-2">
-            <svg className="w-4 h-4 text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            Quick Actions
-          </h3>
-          <div className="space-y-2">
-            <Link href="/archive" className="btn-secondary w-full justify-start">
-              View Performance History
-            </Link>
-            <button className="btn-outline w-full justify-start opacity-60 cursor-not-allowed">
-              Connect Broker (Coming Soon)
-            </button>
-          </div>
-        </div>
-
-        <div className="card border-amber-500/20 bg-amber-500/5">
-          <div className="flex items-start gap-3">
-            <svg className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <div>
-              <h4 className="font-medium text-amber-400 text-sm mb-1">Risk Notice</h4>
-              <p className="text-xs text-dark-400 leading-relaxed">
-                과거 적중률이 미래 수익을 보장하지 않습니다. 투자 판단의 책임은 본인에게 있습니다.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <span className={`text-xs sm:text-sm font-medium ${isUp ? 'text-red-400' : 'text-blue-400'}`}>
+      {isUp ? '▲' : '▼'} {Math.abs(changePercent).toFixed(2)}%
+    </span>
   );
 }
 
 export default function VerdictPage() {
+  const [data, setData] = useState<VerdictData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchVerdict() {
+      try {
+        const res = await fetch('/api/verdict');
+        const json = await res.json();
+        setData(json);
+      } catch (error) {
+        console.error('Failed to fetch verdict:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    fetchVerdict();
+    
+    // 30초마다 새로고침
+    const interval = setInterval(fetchVerdict, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <>
       <DisclaimerBar />
@@ -170,16 +100,120 @@ export default function VerdictPage() {
           <div className="mb-6 sm:mb-8 lg:mb-10">
             <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
               <h1 className="text-2xl sm:text-3xl font-bold text-dark-50">Today's Top 5</h1>
-              <span className="badge-brand text-xs sm:text-sm">Live</span>
+              {data?.isRealTime && (
+                <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/20 text-green-400 text-xs">
+                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                  실시간
+                </span>
+              )}
             </div>
-            <p className="text-sm sm:text-base text-dark-400">
-              AI 3대장의 토론을 통해 도출된 오늘의 주목 종목
+            <p className="text-dark-400 text-sm sm:text-base">
+              {data ? `${data.date} ${data.time} 기준` : '로딩 중...'}
             </p>
           </div>
 
-          <Suspense fallback={<SkeletonList count={5} />}>
-            <VerdictContent />
-          </Suspense>
+          {loading ? (
+            <SkeletonList count={5} />
+          ) : data ? (
+            <div className="grid lg:grid-cols-3 gap-6 lg:gap-8">
+              <div className="lg:col-span-2 space-y-3 sm:space-y-4">
+                {data.top5.map((item, index) => (
+                  <Link key={item.symbolId} href={`/battle/${item.symbol}`}>
+                    <div className="card-interactive group">
+                      <div className="flex items-center gap-3 sm:gap-4">
+                        {/* Rank Badge */}
+                        <RankBadge rank={index + 1} />
+                        
+                        {/* Stock Info */}
+                        <div className="flex-1 min-w-0 overflow-hidden">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mb-1.5 sm:mb-2">
+                            <span className="text-base sm:text-lg font-semibold text-dark-100 group-hover:text-white transition-colors truncate max-w-full">
+                              {item.name}
+                            </span>
+                            <span className="text-xs sm:text-sm text-dark-500 font-mono shrink-0">{item.symbol}</span>
+                            {item.unanimous && (
+                              <span className="badge-success text-2xs shrink-0">Unanimous</span>
+                            )}
+                          </div>
+                          
+                          {/* Price Info */}
+                          {item.currentPrice > 0 && (
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-white font-medium">
+                                {item.currentPrice.toLocaleString()}원
+                              </span>
+                              <PriceChange change={item.change} changePercent={item.changePercent} />
+                            </div>
+                          )}
+                          
+                          <ScoreBar score={item.avgScore} />
+                          <p className="mt-2 sm:mt-3 text-xs sm:text-sm text-dark-400 line-clamp-1">
+                            {item.rationale}
+                          </p>
+                        </div>
+                        
+                        {/* Arrow */}
+                        <div className="shrink-0 text-dark-600 group-hover:text-brand-400 transition-colors">
+                          <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+
+                <div className="flex items-center gap-6 pt-4 border-t border-dark-800">
+                  <div className="flex items-center gap-2">
+                    <span className="badge-success text-xs">Unanimous</span>
+                    <span className="text-sm text-dark-400">= 만장일치 ({data.unanimousCount}개 종목)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sidebar */}
+              <div className="space-y-4 sm:space-y-6">
+                {/* Summary Card */}
+                <div className="card p-4 sm:p-6">
+                  <h3 className="font-semibold text-dark-200 mb-3 sm:mb-4">오늘의 분석 요약</h3>
+                  <p className="text-sm text-dark-400 leading-relaxed">
+                    {data.rationale}
+                  </p>
+                </div>
+
+                {/* Methodology */}
+                <div className="card p-4 sm:p-6">
+                  <h3 className="font-semibold text-dark-200 mb-3 sm:mb-4">평가 방법론</h3>
+                  <ul className="space-y-2 sm:space-y-3 text-sm text-dark-400">
+                    <li className="flex items-start gap-2">
+                      <span className="text-brand-400 mt-1">•</span>
+                      <span>Claude, Gemini, GPT 3개 AI의 개별 분석 점수 평균</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-brand-400 mt-1">•</span>
+                      <span>1~5점 척도, 소수점 첫째 자리까지 표시</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-brand-400 mt-1">•</span>
+                      <span>만장일치(Unanimous)는 3개 AI 모두 4점 이상 부여 시</span>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* CTA */}
+                <Link href="/battle/005930" className="block">
+                  <div className="card-interactive p-4 sm:p-6 text-center">
+                    <p className="text-sm text-dark-400 mb-2">AI들의 토론을 직접 확인하세요</p>
+                    <span className="text-brand-400 font-semibold">토론 보러가기 →</span>
+                  </div>
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-dark-400">데이터를 불러올 수 없습니다.</p>
+            </div>
+          )}
         </div>
       </main>
       <DisclaimerBar variant="bottom" compact />

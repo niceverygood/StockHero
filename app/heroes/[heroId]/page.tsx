@@ -52,6 +52,8 @@ interface Stock {
   name: string;
   currentPrice: number;
   targetPrice: number;
+  change: number;
+  changePercent: number;
   score: number;
   reason: string;
   metrics: Record<string, number | string>;
@@ -68,6 +70,8 @@ interface HeroData {
     methodology: string;
   };
   date: string;
+  time?: string;
+  isRealTime?: boolean;
   stocks: Stock[];
 }
 
@@ -169,12 +173,22 @@ export default function HeroDetailPage() {
         
         {/* Top 5 Section */}
         <div className="mb-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-xl sm:text-2xl font-bold text-white">
               {meta.nameKo}의 Top 5
             </h2>
             {data && (
-              <span className="text-sm text-dark-400">{data.date} 기준</span>
+              <div className="flex items-center gap-2">
+                {data.isRealTime && (
+                  <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/20 text-green-400 text-xs">
+                    <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                    실시간
+                  </span>
+                )}
+                <span className="text-sm text-dark-400">
+                  {data.date} {data.time}
+                </span>
+              </div>
             )}
           </div>
         </div>
@@ -233,12 +247,21 @@ export default function HeroDetailPage() {
                   
                   {/* Price & Score */}
                   <div className="text-right shrink-0 hidden sm:block">
-                    <p className="text-lg font-bold text-white">{stock.currentPrice.toLocaleString()}원</p>
+                    <div className="flex items-center justify-end gap-2">
+                      <p className="text-lg font-bold text-white">{stock.currentPrice.toLocaleString()}원</p>
+                      {stock.change !== 0 && (
+                        <span className={`text-sm ${stock.change > 0 ? 'text-red-400' : 'text-blue-400'}`}>
+                          {stock.change > 0 ? '▲' : '▼'} {Math.abs(stock.changePercent).toFixed(2)}%
+                        </span>
+                      )}
+                    </div>
                     <p className={`text-sm ${meta.textColor}`}>
                       목표 {stock.targetPrice.toLocaleString()}원
-                      <span className="text-green-400 ml-2">
-                        (+{Math.round((stock.targetPrice - stock.currentPrice) / stock.currentPrice * 100)}%)
-                      </span>
+                      {stock.currentPrice > 0 && (
+                        <span className="text-green-400 ml-2">
+                          (+{Math.round((stock.targetPrice - stock.currentPrice) / stock.currentPrice * 100)}%)
+                        </span>
+                      )}
                     </p>
                   </div>
                   
@@ -264,12 +287,21 @@ export default function HeroDetailPage() {
                   <div className="px-4 sm:px-6 pb-4 sm:pb-6 border-t border-dark-700/50">
                     {/* Mobile Price */}
                     <div className="sm:hidden py-4 border-b border-dark-700/50 mb-4">
-                      <p className="text-lg font-bold text-white">{stock.currentPrice.toLocaleString()}원</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-lg font-bold text-white">{stock.currentPrice.toLocaleString()}원</p>
+                        {stock.change !== 0 && (
+                          <span className={`text-sm ${stock.change > 0 ? 'text-red-400' : 'text-blue-400'}`}>
+                            {stock.change > 0 ? '▲' : '▼'} {Math.abs(stock.changePercent).toFixed(2)}%
+                          </span>
+                        )}
+                      </div>
                       <p className={`text-sm ${meta.textColor}`}>
                         목표 {stock.targetPrice.toLocaleString()}원
-                        <span className="text-green-400 ml-2">
-                          (+{Math.round((stock.targetPrice - stock.currentPrice) / stock.currentPrice * 100)}%)
-                        </span>
+                        {stock.currentPrice > 0 && (
+                          <span className="text-green-400 ml-2">
+                            (+{Math.round((stock.targetPrice - stock.currentPrice) / stock.currentPrice * 100)}%)
+                          </span>
+                        )}
                       </p>
                     </div>
                     
