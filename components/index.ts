@@ -14,6 +14,7 @@ export { Calendar, VerdictDetail } from './Calendar';
 export { CharacterDetailModal } from './CharacterDetailModal';
 export { AIPortfolioSimulator } from './AIPortfolioSimulator';
 export { AIConsultation, AIConsultationModal } from './AIConsultation';
+export { MultiExpertConsultation } from './MultiExpertConsultation';
 export { WatchlistButton } from './WatchlistButton';
 export { MyPortfolioViewer, PortfolioUploader } from './MyPortfolio';
 export { FeedComposer, FeedList, PostCard, FollowButton } from './Community';

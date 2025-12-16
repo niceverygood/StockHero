@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { DisclaimerBar, Header, CharacterAvatar, WatchlistButton, AIConsultationModal } from '@/components';
+import { DisclaimerBar, Header, CharacterAvatar, WatchlistButton, AIConsultationModal, MultiExpertConsultation } from '@/components';
 import { CharacterDetailModal } from '@/components/CharacterDetailModal';
 import { CHARACTERS, CharacterInfo } from '@/lib/characters';
 import { useDebateHistory } from '@/lib/hooks';
@@ -502,6 +502,7 @@ export default function BattlePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [targets, setTargets] = useState<TargetInfo[]>([]);
   const [consultCharacter, setConsultCharacter] = useState<CharacterType | null>(null);
+  const [isMultiConsultOpen, setIsMultiConsultOpen] = useState(false);
   const [realTimeInfo, setRealTimeInfo] = useState<RealTimeStockInfo | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const processedMessageIds = useRef<Set<string>>(new Set()); // 이미 처리된 메시지 ID 추적
@@ -523,8 +524,12 @@ export default function BattlePage() {
         const data = await res.json();
         
         if (data.success && data.data) {
+          // API에서 심볼 코드가 반환되면 baseSymbolInfo.name 사용
+          const apiName = data.data.name;
+          const isValidName = apiName && !/^\d+$/.test(apiName); // 숫자로만 이루어진 이름은 무효
+          
           setRealTimeInfo({
-            name: data.data.name || baseSymbolInfo.name,
+            name: isValidName ? apiName : baseSymbolInfo.name,
             sector: baseSymbolInfo.sector,
             price: data.data.price,
             change: data.data.change || 0,
@@ -972,13 +977,13 @@ export default function BattlePage() {
                     })}
                   </div>
                   <button
-                    onClick={() => setConsultCharacter('claude')}
+                    onClick={() => setIsMultiConsultOpen(true)}
                     className="w-full mt-2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 text-white text-sm font-medium hover:opacity-90 transition-all flex items-center justify-center gap-2"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
-                    {symbolInfo.name} 종목 상담받기
+                    3명의 전문가 모두에게 상담받기
                   </button>
                 </div>
               </div>
@@ -1031,6 +1036,14 @@ export default function BattlePage() {
         onClose={() => setConsultCharacter(null)}
         characterType={consultCharacter || 'claude'}
         showDebateButton={false}
+      />
+
+      {/* Multi Expert Consultation Modal */}
+      <MultiExpertConsultation
+        isOpen={isMultiConsultOpen}
+        onClose={() => setIsMultiConsultOpen(false)}
+        stockSymbol={symbol}
+        stockName={symbolInfo.name}
       />
     </>
   );
