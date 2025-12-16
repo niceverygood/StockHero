@@ -26,7 +26,7 @@ const HEROES = [
       { icon: '📈', text: '실적 성장률 & 수익성 지표' },
     ],
     criteria: '펀더멘털이 검증된 저평가 우량주',
-    buttonText: '클로드의 Top 5 받아보기',
+    buttonText: '클로드리의 Top 5 받아보기',
     avatar: '/avatars/claude.png',
   },
   {
@@ -48,7 +48,7 @@ const HEROES = [
       { icon: '🎯', text: 'TAM 확대 & 시장 지배력' },
     ],
     criteria: '미래를 선도할 고성장 혁신 기업',
-    buttonText: '제미의 Top 5 받아보기',
+    buttonText: '제미나인의 Top 5 받아보기',
     avatar: '/avatars/gemini.png',
   },
   {
@@ -70,7 +70,7 @@ const HEROES = [
       { icon: '🌍', text: '거시경제 리스크 고려' },
     ],
     criteria: '어떤 위기에도 버틸 수 있는 방어주',
-    buttonText: '테일러의 Top 5 받아보기',
+    buttonText: '쥐피테일러의 Top 5 받아보기',
     avatar: '/avatars/gpt.png',
   },
 ];
