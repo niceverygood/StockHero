@@ -291,7 +291,7 @@ export default function HeroDetailPage() {
               
               <div className={`${meta.bgColor} rounded-xl p-4 inline-block`}>
                 <p className={`text-lg sm:text-xl font-bold ${meta.textColor}`}>
-                  "{meta.tagline}"
+                  &quot;{meta.tagline}&quot;
                 </p>
               </div>
             </div>

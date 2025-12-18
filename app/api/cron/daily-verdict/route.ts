@@ -128,12 +128,21 @@ JSON 형식으로 응답:
 }
 
 // 점수 합산 및 Top 5 선정
+interface StockScore {
+  symbol: string;
+  name: string;
+  claudeScore: number;
+  geminiScore: number;
+  gptScore: number;
+  reasons: string[];
+}
+
 function aggregateTop5(claudeTop5: any[], geminiTop5: any[], gptTop5: any[], realPrices: Map<string, any>): any[] {
-  const scoreMap = new Map<string, { symbol: string; name: string; claudeScore: number; geminiScore: number; gptScore: number; reasons: string[] }>();
+  const scoreMap = new Map<string, StockScore>();
 
   // Claude 점수 집계
   claudeTop5.forEach((item, idx) => {
-    const existing = scoreMap.get(item.symbol) || { symbol: item.symbol, name: item.name, claudeScore: 0, geminiScore: 0, gptScore: 0, reasons: [] };
+    const existing: StockScore = scoreMap.get(item.symbol) || { symbol: item.symbol, name: item.name, claudeScore: 0, geminiScore: 0, gptScore: 0, reasons: [] as string[] };
     existing.claudeScore = item.score || (5 - idx * 0.5);
     existing.reasons.push(`클로드: ${item.reason}`);
     scoreMap.set(item.symbol, existing);
@@ -141,7 +150,7 @@ function aggregateTop5(claudeTop5: any[], geminiTop5: any[], gptTop5: any[], rea
 
   // Gemini 점수 집계
   geminiTop5.forEach((item, idx) => {
-    const existing = scoreMap.get(item.symbol) || { symbol: item.symbol, name: item.name, claudeScore: 0, geminiScore: 0, gptScore: 0, reasons: [] };
+    const existing: StockScore = scoreMap.get(item.symbol) || { symbol: item.symbol, name: item.name, claudeScore: 0, geminiScore: 0, gptScore: 0, reasons: [] as string[] };
     existing.geminiScore = item.score || (5 - idx * 0.5);
     if (item.name) existing.name = item.name;
     existing.reasons.push(`제미나인: ${item.reason}`);
@@ -150,7 +159,7 @@ function aggregateTop5(claudeTop5: any[], geminiTop5: any[], gptTop5: any[], rea
 
   // GPT 점수 집계
   gptTop5.forEach((item, idx) => {
-    const existing = scoreMap.get(item.symbol) || { symbol: item.symbol, name: item.name, claudeScore: 0, geminiScore: 0, gptScore: 0, reasons: [] };
+    const existing: StockScore = scoreMap.get(item.symbol) || { symbol: item.symbol, name: item.name, claudeScore: 0, geminiScore: 0, gptScore: 0, reasons: [] as string[] };
     existing.gptScore = item.score || (5 - idx * 0.5);
     if (item.name) existing.name = item.name;
     existing.reasons.push(`쥐피테일러: ${item.reason}`);

@@ -192,7 +192,7 @@ const KOSDAQ_STOCKS: KRXStock[] = [
 export const KRX_ALL_STOCKS: KRXStock[] = [...KOSPI_STOCKS, ...KOSDAQ_STOCKS];
 
 // 섹터 목록
-export const KRX_SECTORS = [...new Set(KRX_ALL_STOCKS.map(s => s.sector))].sort();
+export const KRX_SECTORS = Array.from(new Set(KRX_ALL_STOCKS.map(s => s.sector))).sort();
 
 // 종목 코드로 검색
 export function findStockBySymbol(symbol: string): KRXStock | undefined {

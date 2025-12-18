@@ -174,7 +174,7 @@ function generateDynamicReaction(
   for (const msg of previousMessages) {
     if (msg.character === character) continue;
     
-    const otherName = CHARACTER_BACKSTORIES[msg.character].nameKo;
+    const otherName = CHARACTER_BACKSTORIES[msg.character as CharacterType]?.nameKo || msg.character;
     const content = msg.content.toLowerCase();
     
     // 캐릭터별 특정 트리거에 반응

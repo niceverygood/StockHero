@@ -132,7 +132,7 @@ export default function HeroesPage() {
                 {/* Tagline */}
                 <div className={`${hero.bgColor} rounded-xl p-4 sm:p-5 mb-6`}>
                   <p className={`text-lg sm:text-xl font-bold ${hero.textColor} mb-2`}>
-                    "{hero.tagline}"
+                    &quot;{hero.tagline}&quot;
                   </p>
                   <p className="text-sm sm:text-base text-dark-200">
                     {hero.description}

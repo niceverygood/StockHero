@@ -175,7 +175,7 @@ export default function VerdictPage() {
             </div>
 
             {/* Page Title */}
-            <h1 className="text-2xl sm:text-3xl font-bold text-dark-50">Today's Top 5</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-dark-50">Today&apos;s Top 5</h1>
           </div>
 
           {loading ? (

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createOrchestrator } from '@/lib/llm';
+import { DebateOrchestrator } from '@/lib/llm';
 import { selectTop5, generateRationale, type SymbolEvaluation } from '@/lib/scoring';
 
 // Mock symbols for evaluation
@@ -32,32 +32,58 @@ export async function POST(request: NextRequest) {
     const { date } = body;
 
     const targetDate = date || new Date().toISOString().split('T')[0];
-    const orchestrator = createOrchestrator();
 
     // Evaluate all candidates
     const evaluations: SymbolEvaluation[] = [];
 
     for (const candidate of CANDIDATE_SYMBOLS) {
-      const result = await orchestrator.evaluateSymbol(
-        candidate.symbol,
-        candidate.name,
-        candidate.sector
-      );
+      const orchestrator = new DebateOrchestrator();
+      orchestrator.setCurrentPrice(50000); // Default price
 
-      const evaluation: SymbolEvaluation = {
-        symbolId: candidate.id,
-        symbol: candidate.symbol,
-        name: candidate.name,
-        sector: candidate.sector,
-        scores: result.scores,
-        avgScore: result.avgScore,
-        riskFlags: result.riskFlags,
-        hasUnanimous: result.hasConsensus,
-        rationale: '',
-      };
-      
-      evaluation.rationale = generateRationale(evaluation);
-      evaluations.push(evaluation);
+      try {
+        const messages = await orchestrator.generateRound(candidate.symbol, candidate.name, 1);
+        
+        const scores = {
+          claude: 3,
+          gemini: 3,
+          gpt: 3,
+        };
+        
+        const riskFlags: string[] = [];
+        
+        messages.forEach((msg) => {
+          const charType = msg.character.toLowerCase() as 'claude' | 'gemini' | 'gpt';
+          if (charType in scores) {
+            scores[charType] = msg.score;
+          }
+          if (msg.risks) {
+            riskFlags.push(...msg.risks);
+          }
+        });
+        
+        const avgScore = (scores.claude + scores.gemini + scores.gpt) / 3;
+        const hasUnanimous = scores.claude >= 4 && scores.gemini >= 4 && scores.gpt >= 4;
+
+        const evaluation: SymbolEvaluation = {
+          symbolId: candidate.id,
+          symbol: candidate.symbol,
+          name: candidate.name,
+          sector: candidate.sector,
+          scores,
+          avgScore,
+          riskFlags: Array.from(new Set(riskFlags)),
+          hasUnanimous,
+          rationale: '',
+        };
+        
+        evaluation.rationale = generateRationale(evaluation);
+        evaluations.push(evaluation);
+        
+        // Add small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error(`Error evaluating ${candidate.name}:`, error);
+      }
     }
 
     // Select top 5 using consensus rules

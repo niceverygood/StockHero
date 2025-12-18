@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -9,6 +9,15 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { supabase } from '@/lib/supabase/client';
 import { CHARACTERS } from '@/lib/characters';
 import type { CharacterType } from '@/lib/llm/types';
+
+// Loading fallback for Suspense
+function MyPageLoading() {
+  return (
+    <div className="min-h-screen bg-dark-950 flex items-center justify-center">
+      <div className="animate-pulse text-dark-400">로딩 중...</div>
+    </div>
+  );
+}
 
 interface DebateHistory {
   id: string;
@@ -46,7 +55,16 @@ interface UserStats {
 
 type TabType = 'overview' | 'feed' | 'portfolio' | 'debates' | 'consultations' | 'watchlist' | 'settings';
 
+// Main page wrapper with Suspense
 export default function MyPage() {
+  return (
+    <Suspense fallback={<MyPageLoading />}>
+      <MyPageContent />
+    </Suspense>
+  );
+}
+
+function MyPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
@@ -471,7 +489,7 @@ export default function MyPage() {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
                                   <span className="font-medium text-white">{char.name}</span>
-                                  <span className={`px-2 py-0.5 rounded-full text-xs ${char.bgColor} ${char.textColor}`}>
+                                  <span className={`px-2 py-0.5 rounded-full text-xs ${char.bgColor} ${char.color}`}>
                                     {char.role}
                                   </span>
                                 </div>

@@ -69,7 +69,7 @@ export function selectTop5(evaluations: SymbolEvaluation[]): Top5Result {
   }
   
   // Add sector insight
-  const sectors = [...new Set(top5.map(e => e.sector))];
+  const sectors = Array.from(new Set(top5.map(e => e.sector)));
   if (sectors.length <= 2) {
     rationale += `${sectors.join(', ')} 업종에 대한 선호가 두드러집니다.`;
   } else {

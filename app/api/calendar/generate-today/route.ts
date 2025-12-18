@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createOrchestrator } from '@/lib/llm';
-import type { LLMContext, CharacterType } from '@/lib/llm';
+import { DebateOrchestrator } from '@/lib/llm';
+import type { CharacterType } from '@/lib/llm';
 
 // Korean stocks to analyze
 const CANDIDATE_STOCKS = [
@@ -56,7 +56,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const orchestrator = createOrchestrator();
     const stockScores: Array<{
       stock: typeof CANDIDATE_STOCKS[0];
       scores: { claude: number; gemini: number; gpt: number };
@@ -66,16 +65,11 @@ export async function POST(request: NextRequest) {
 
     // Analyze each stock with all 3 AIs
     for (const stock of CANDIDATE_STOCKS) {
-      const context: LLMContext = {
-        symbol: stock.code,
-        symbolName: stock.name,
-        sector: stock.sector,
-        round: 1,
-        previousMessages: [],
-      };
+      const orchestrator = new DebateOrchestrator();
+      orchestrator.setCurrentPrice(50000); // Default price
 
       try {
-        const result = await orchestrator.generateRound(context);
+        const messages = await orchestrator.generateRound(stock.code, stock.name, 1);
         
         const scores = {
           claude: 3,
@@ -84,10 +78,10 @@ export async function POST(request: NextRequest) {
         };
 
         let rationale = '';
-        result.messages.forEach((msg) => {
-          const charType = msg.character.toLowerCase() as 'claude' | 'gemini' | 'gpt';
+        messages.forEach((msg) => {
+          const charType = msg.character.toLowerCase() as CharacterType;
           if (charType in scores) {
-            scores[charType] = msg.score;
+            scores[charType as 'claude' | 'gemini' | 'gpt'] = msg.score;
           }
           rationale += `[${msg.character}] ${msg.content.substring(0, 100)}... `;
         });

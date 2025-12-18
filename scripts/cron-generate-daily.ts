@@ -8,7 +8,7 @@
  * For production: Configure as Vercel Cron or external scheduler
  */
 
-import { createOrchestrator } from '../lib/llm';
+import { DebateOrchestrator } from '../lib/llm';
 import { selectTop5, generateRationale, type SymbolEvaluation } from '../lib/scoring';
 
 const CANDIDATE_SYMBOLS = [
@@ -38,7 +38,6 @@ async function generateDailyVerdict() {
   const today = new Date().toISOString().split('T')[0];
   console.log(`[${today}] Starting daily verdict generation...`);
   
-  const orchestrator = createOrchestrator();
   const evaluations: SymbolEvaluation[] = [];
 
   console.log(`Evaluating ${CANDIDATE_SYMBOLS.length} candidates...`);
@@ -46,26 +45,52 @@ async function generateDailyVerdict() {
   for (const candidate of CANDIDATE_SYMBOLS) {
     console.log(`  Evaluating: ${candidate.name} (${candidate.symbol})`);
     
-    const result = await orchestrator.evaluateSymbol(
-      candidate.symbol,
-      candidate.name,
-      candidate.sector
-    );
-
-    const evaluation: SymbolEvaluation = {
-      symbolId: candidate.id,
-      symbol: candidate.symbol,
-      name: candidate.name,
-      sector: candidate.sector,
-      scores: result.scores,
-      avgScore: result.avgScore,
-      riskFlags: result.riskFlags,
-      hasUnanimous: result.hasConsensus,
-      rationale: '',
-    };
+    const orchestrator = new DebateOrchestrator();
+    orchestrator.setCurrentPrice(50000);
     
-    evaluation.rationale = generateRationale(evaluation);
-    evaluations.push(evaluation);
+    try {
+      const messages = await orchestrator.generateRound(candidate.symbol, candidate.name, 1);
+      
+      const scores = {
+        claude: 3,
+        gemini: 3,
+        gpt: 3,
+      };
+      
+      const riskFlags: string[] = [];
+      
+      messages.forEach((msg) => {
+        const charType = msg.character.toLowerCase() as 'claude' | 'gemini' | 'gpt';
+        if (charType in scores) {
+          scores[charType] = msg.score;
+        }
+        if (msg.risks) {
+          riskFlags.push(...msg.risks);
+        }
+      });
+      
+      const avgScore = (scores.claude + scores.gemini + scores.gpt) / 3;
+      const hasUnanimous = scores.claude >= 4 && scores.gemini >= 4 && scores.gpt >= 4;
+
+      const evaluation: SymbolEvaluation = {
+        symbolId: candidate.id,
+        symbol: candidate.symbol,
+        name: candidate.name,
+        sector: candidate.sector,
+        scores,
+        avgScore,
+        riskFlags: Array.from(new Set(riskFlags)),
+        hasUnanimous,
+        rationale: '',
+      };
+      
+      evaluation.rationale = generateRationale(evaluation);
+      evaluations.push(evaluation);
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+      console.error(`  Error evaluating ${candidate.name}:`, error);
+    }
   }
 
   // Select top 5 using consensus rules

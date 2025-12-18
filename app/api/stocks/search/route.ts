@@ -148,7 +148,19 @@ export async function GET(request: NextRequest) {
     }
 
     // 4. 로컬 결과를 표준 형식으로 변환
-    let allResults = localResults.map(stock => ({
+    type SearchResult = {
+      symbol: string;
+      name: string;
+      market: 'KOSPI' | 'KOSDAQ';
+      sector: string;
+      source: 'local' | 'external' | 'kis';
+      externalType?: 'stock' | 'etf' | 'etn' | 'other';
+      price?: number;
+      change?: number;
+      changePercent?: number;
+    };
+    
+    let allResults: SearchResult[] = localResults.map(stock => ({
       symbol: stock.symbol,
       name: stock.name,
       market: stock.market,
