@@ -276,6 +276,13 @@ export function VerdictDetail({ date, verdict, onGenerateClick, isGenerating }: 
   const [debateMessages, setDebateMessages] = useState<DebateMessage[]>([]);
   const [loadingDebate, setLoadingDebate] = useState(false);
 
+  // 날짜가 변경되면 선택된 종목 초기화
+  useEffect(() => {
+    setSelectedStock(null);
+    setDebateMessages([]);
+    setSelectedSector('all');
+  }, [date]);
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const selectedDate = new Date(date);

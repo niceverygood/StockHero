@@ -7,28 +7,39 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Mock Korean stocks for generating fallback verdicts
+// Mock Korean stocks for generating fallback verdicts (대형주 + 중소형주 + 테마주)
 const MOCK_STOCKS = [
+  // 대형주
   { code: '005930', name: '삼성전자', sector: '반도체' },
   { code: '000660', name: 'SK하이닉스', sector: '반도체' },
-  { code: '373220', name: 'LG에너지솔루션', sector: '2차전지' },
-  { code: '207940', name: '삼성바이오로직스', sector: '바이오' },
   { code: '005380', name: '현대차', sector: '자동차' },
-  { code: '006400', name: '삼성SDI', sector: '2차전지' },
-  { code: '035720', name: '카카오', sector: 'IT서비스' },
   { code: '035420', name: 'NAVER', sector: 'IT서비스' },
-  { code: '051910', name: 'LG화학', sector: '화학' },
-  { code: '000270', name: '기아', sector: '자동차' },
   { code: '105560', name: 'KB금융', sector: '금융' },
+  { code: '017670', name: 'SK텔레콤', sector: '통신' },
+  
+  // 중형 성장주 (개인투자자 선호)
+  { code: '247540', name: '에코프로비엠', sector: '2차전지' },
+  { code: '086520', name: '에코프로', sector: '2차전지' },
+  { code: '352820', name: '하이브', sector: '엔터' },
+  { code: '196170', name: '알테오젠', sector: '바이오' },
+  
+  // AI/로봇 테마
+  { code: '443060', name: '레인보우로보틱스', sector: 'AI/로봇' },
+  { code: '042700', name: '한미반도체', sector: '반도체장비' },
+  
+  // 방산 테마
+  { code: '012450', name: '한화에어로스페이스', sector: '방산' },
+  { code: '047810', name: '한국항공우주', sector: '방산' },
+  
+  // 소형 고성장주
+  { code: '058470', name: '리노공업', sector: '반도체장비' },
+  { code: '145020', name: '휴젤', sector: '바이오' },
+  { code: '039030', name: '이오테크닉스', sector: '반도체장비' },
+  
+  // 안정 대형주
   { code: '055550', name: '신한지주', sector: '금융' },
-  { code: '096770', name: 'SK이노베이션', sector: '에너지' },
-  { code: '034730', name: 'SK', sector: '지주' },
-  { code: '003550', name: 'LG', sector: '지주' },
-  { code: '066570', name: 'LG전자', sector: '가전' },
-  { code: '028260', name: '삼성물산', sector: '건설' },
-  { code: '012330', name: '현대모비스', sector: '자동차부품' },
-  { code: '068270', name: '셀트리온', sector: '바이오' },
-  { code: '003670', name: '포스코홀딩스', sector: '철강' },
+  { code: '032830', name: '삼성생명', sector: '보험' },
+  { code: '395400', name: '맥쿼리인프라', sector: '인프라' },
 ];
 
 // Sector lookup
@@ -46,6 +57,41 @@ function seededRandom(seed: number): number {
   const x = Math.sin(seed) * 10000;
   return x - Math.floor(x);
 }
+
+// 실제 주가 기준 더미 데이터용 기준가 (최신 시장가 반영)
+const REAL_BASE_PRICES: Record<string, number> = {
+  // 대형주
+  '005930': 107000,  // 삼성전자
+  '000660': 565000,  // SK하이닉스
+  '005380': 210000,  // 현대차
+  '035420': 195000,  // NAVER
+  '105560': 124000,  // KB금융
+  '017670': 58000,   // SK텔레콤
+  
+  // 중형 성장주
+  '247540': 120000,  // 에코프로비엠
+  '086520': 65000,   // 에코프로
+  '352820': 265000,  // 하이브
+  '196170': 350000,  // 알테오젠
+  
+  // AI/로봇 테마
+  '443060': 145000,  // 레인보우로보틱스
+  '042700': 125000,  // 한미반도체
+  
+  // 방산 테마
+  '012450': 350000,  // 한화에어로스페이스
+  '047810': 65000,   // 한국항공우주
+  
+  // 소형 고성장주
+  '058470': 200000,  // 리노공업
+  '145020': 180000,  // 휴젤
+  '039030': 180000,  // 이오테크닉스
+  
+  // 안정 대형주
+  '055550': 77000,   // 신한지주
+  '032830': 85000,   // 삼성생명
+  '395400': 12000,   // 맥쿼리인프라
+};
 
 function generateDummyVerdict(dateStr: string) {
   const dateSeed = dateStr.split('-').map(Number).reduce((a, b) => a * 100 + b, 0);
@@ -66,9 +112,12 @@ function generateDummyVerdict(dateStr: string) {
     const gptScore = Number((3.0 + seededRandom(baseSeed + 3) * 2.0).toFixed(1));
     const avgScore = Number(((claudeScore + geminiScore + gptScore) / 3).toFixed(1));
     
-    // Generate target price based on a base price
-    const basePrice = 50000 + (parseInt(stock.code) % 1000) * 100;
-    const targetPrice = Math.round(basePrice * (1 + 0.1 + seededRandom(baseSeed + 4) * 0.2) / 100) * 100;
+    // 실제 주가 기준으로 목표가 계산 (10-25% 상승 목표)
+    const realBasePrice = REAL_BASE_PRICES[stock.code] || 100000;
+    const priceVariation = 0.95 + seededRandom(baseSeed) * 0.1; // ±5% 변동
+    const currentPrice = Math.round(realBasePrice * priceVariation / 100) * 100;
+    const targetMultiplier = 1.10 + seededRandom(baseSeed + 4) * 0.15; // 10-25% 목표 상승
+    const targetPrice = Math.round(currentPrice * targetMultiplier / 100) * 100;
     
     // Target date (1-6 months from the date)
     const dateObj = new Date(dateStr);
@@ -85,6 +134,7 @@ function generateDummyVerdict(dateStr: string) {
       claudeScore,
       geminiScore,
       gptScore,
+      currentPrice,
       targetPrice,
       targetDate,
     };

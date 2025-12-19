@@ -9,28 +9,45 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '');
 
-// 분석 대상 종목 목록 (실시간 데이터와 기본 정보)
+// 분석 대상 종목 목록 (대형주 + 중소형주 + 테마주 다양화)
 const ANALYSIS_STOCKS = [
-  { symbol: '005930', name: '삼성전자', sector: '반도체', per: 15.2, pbr: 1.1, roe: 8.5, dividend: 1.8, growth: 10.5 },
-  { symbol: '000660', name: 'SK하이닉스', sector: '반도체', per: 8.5, pbr: 1.8, roe: 22.1, dividend: 0.5, growth: 45.2 },
-  { symbol: '373220', name: 'LG에너지솔루션', sector: '2차전지', per: 45.0, pbr: 3.5, roe: 15.0, dividend: 0.3, growth: 35.5 },
-  { symbol: '207940', name: '삼성바이오로직스', sector: '바이오', per: 60.0, pbr: 5.0, roe: 10.0, dividend: 0.1, growth: 20.0 },
-  { symbol: '005380', name: '현대차', sector: '자동차', per: 7.0, pbr: 0.7, roe: 12.0, dividend: 3.0, growth: 8.0 },
-  { symbol: '006400', name: '삼성SDI', sector: '2차전지', per: 30.0, pbr: 2.0, roe: 13.0, dividend: 0.4, growth: 28.0 },
-  { symbol: '035720', name: '카카오', sector: 'IT서비스', per: 28.0, pbr: 1.5, roe: 7.0, dividend: 0.2, growth: 18.0 },
-  { symbol: '035420', name: 'NAVER', sector: 'IT서비스', per: 22.0, pbr: 1.2, roe: 9.0, dividend: 0.3, growth: 15.0 },
-  { symbol: '051910', name: 'LG화학', sector: '화학', per: 18.0, pbr: 1.0, roe: 11.0, dividend: 1.5, growth: 12.0 },
-  { symbol: '000270', name: '기아', sector: '자동차', per: 6.5, pbr: 0.6, roe: 13.0, dividend: 3.5, growth: 9.0 },
-  { symbol: '105560', name: 'KB금융', sector: '금융', per: 6.2, pbr: 0.52, roe: 9.8, dividend: 5.1, growth: 5.0 },
-  { symbol: '055550', name: '신한지주', sector: '금융', per: 5.8, pbr: 0.48, roe: 9.5, dividend: 4.8, growth: 4.5 },
-  { symbol: '068270', name: '셀트리온', sector: '바이오', per: 50.0, pbr: 4.0, roe: 11.0, dividend: 0.2, growth: 18.0 },
-  { symbol: '003670', name: '포스코홀딩스', sector: '철강', per: 12.0, pbr: 0.7, roe: 7.0, dividend: 2.5, growth: 7.0 },
-  { symbol: '066570', name: 'LG전자', sector: '가전', per: 10.0, pbr: 0.8, roe: 10.0, dividend: 1.0, growth: 6.0 },
-  { symbol: '017670', name: 'SK텔레콤', sector: '통신', per: 10.5, pbr: 0.85, roe: 8.2, dividend: 4.2, growth: 3.0 },
-  { symbol: '030200', name: 'KT', sector: '통신', per: 9.0, pbr: 0.7, roe: 7.0, dividend: 4.5, growth: 2.5 },
-  { symbol: '032830', name: '삼성생명', sector: '보험', per: 7.5, pbr: 0.75, roe: 6.5, dividend: 3.8, growth: 4.0 },
-  { symbol: '086790', name: '하나금융지주', sector: '금융', per: 5.2, pbr: 0.45, roe: 10.2, dividend: 5.5, growth: 6.0 },
-  { symbol: '009150', name: '삼성전기', sector: '전자부품', per: 18.0, pbr: 1.3, roe: 12.0, dividend: 0.8, growth: 10.0 },
+  // === 대형주 ===
+  { symbol: '005930', name: '삼성전자', sector: '반도체', per: 15.2, pbr: 1.1, roe: 8.5, dividend: 1.8, growth: 10.5, marketCap: '대형' },
+  { symbol: '000660', name: 'SK하이닉스', sector: '반도체', per: 8.5, pbr: 1.8, roe: 22.1, dividend: 0.5, growth: 45.2, marketCap: '대형' },
+  { symbol: '005380', name: '현대차', sector: '자동차', per: 7.0, pbr: 0.7, roe: 12.0, dividend: 3.0, growth: 8.0, marketCap: '대형' },
+  { symbol: '035420', name: 'NAVER', sector: 'IT서비스', per: 22.0, pbr: 1.2, roe: 9.0, dividend: 0.3, growth: 15.0, marketCap: '대형' },
+  { symbol: '105560', name: 'KB금융', sector: '금융', per: 6.2, pbr: 0.52, roe: 9.8, dividend: 5.1, growth: 5.0, marketCap: '대형' },
+  
+  // === 중형주 (개인투자자 선호) ===
+  { symbol: '247540', name: '에코프로비엠', sector: '2차전지', per: 95.0, pbr: 12.5, roe: 18.0, dividend: 0.1, growth: 85.0, marketCap: '중형' },
+  { symbol: '086520', name: '에코프로', sector: '2차전지', per: 120.0, pbr: 15.0, roe: 15.0, dividend: 0.1, growth: 70.0, marketCap: '중형' },
+  { symbol: '377300', name: '카카오페이', sector: '핀테크', per: 0, pbr: 5.8, roe: -2.0, dividend: 0, growth: 35.0, marketCap: '중형' },
+  { symbol: '352820', name: '하이브', sector: '엔터', per: 45.0, pbr: 4.5, roe: 12.0, dividend: 0, growth: 25.0, marketCap: '중형' },
+  { symbol: '196170', name: '알테오젠', sector: '바이오', per: 0, pbr: 25.0, roe: 35.0, dividend: 0, growth: 150.0, marketCap: '중형' },
+  
+  // === AI/로봇 테마 ===
+  { symbol: '443060', name: '레인보우로보틱스', sector: 'AI/로봇', per: 0, pbr: 18.0, roe: -5.0, dividend: 0, growth: 200.0, marketCap: '중소형' },
+  { symbol: '099320', name: '쏠리드', sector: 'AI/통신', per: 15.0, pbr: 2.5, roe: 18.0, dividend: 0.5, growth: 45.0, marketCap: '중소형' },
+  { symbol: '419120', name: 'LS에코에너지', sector: '전력인프라', per: 25.0, pbr: 4.0, roe: 20.0, dividend: 0.3, growth: 60.0, marketCap: '중형' },
+  
+  // === 방산 테마 ===
+  { symbol: '012450', name: '한화에어로스페이스', sector: '방산', per: 35.0, pbr: 3.5, roe: 12.0, dividend: 0.5, growth: 40.0, marketCap: '대형' },
+  { symbol: '047810', name: '한국항공우주', sector: '방산', per: 28.0, pbr: 3.0, roe: 14.0, dividend: 0.8, growth: 35.0, marketCap: '대형' },
+  { symbol: '042700', name: '한미반도체', sector: '반도체장비', per: 40.0, pbr: 8.0, roe: 25.0, dividend: 0.3, growth: 80.0, marketCap: '중형' },
+  
+  // === 리츠/배당주 ===
+  { symbol: '395400', name: '맥쿼리인프라', sector: '인프라', per: 15.0, pbr: 1.0, roe: 8.0, dividend: 6.5, growth: 5.0, marketCap: '중형' },
+  { symbol: '161390', name: '한국타이어앤테크놀로지', sector: '자동차부품', per: 8.0, pbr: 0.6, roe: 10.0, dividend: 4.0, growth: 8.0, marketCap: '중형' },
+  
+  // === 소형 고성장주 ===
+  { symbol: '058470', name: '리노공업', sector: '반도체장비', per: 30.0, pbr: 5.0, roe: 22.0, dividend: 0.5, growth: 50.0, marketCap: '소형' },
+  { symbol: '145020', name: '휴젤', sector: '바이오', per: 35.0, pbr: 6.0, roe: 20.0, dividend: 0.3, growth: 30.0, marketCap: '중형' },
+  { symbol: '039030', name: '이오테크닉스', sector: '반도체장비', per: 25.0, pbr: 4.5, roe: 20.0, dividend: 0.4, growth: 55.0, marketCap: '소형' },
+  
+  // === 안정 대형주 (방어) ===
+  { symbol: '017670', name: 'SK텔레콤', sector: '통신', per: 10.5, pbr: 0.85, roe: 8.2, dividend: 4.2, growth: 3.0, marketCap: '대형' },
+  { symbol: '055550', name: '신한지주', sector: '금융', per: 5.8, pbr: 0.48, roe: 9.5, dividend: 4.8, growth: 4.5, marketCap: '대형' },
+  { symbol: '032830', name: '삼성생명', sector: '보험', per: 7.5, pbr: 0.75, roe: 6.5, dividend: 3.8, growth: 4.0, marketCap: '대형' },
 ];
 
 // 캐릭터별 세계관 및 분석 기준
@@ -131,6 +148,12 @@ async function analyzeWithClaude(stocks: typeof ANALYSIS_STOCKS, realPrices: Map
 ## 분석 대상 종목
 ${stockList}
 
+## 중요: 분석 시 반드시 다음 수치를 근거로 제시하세요
+- PER/PBR 수치와 업종 평균 대비 저/고평가 정도
+- ROE 수치와 의미 (10% 이상이면 우수)
+- 배당수익률 vs 시장 평균(약 2%)
+- 구체적인 밸류에이션 계산 (예: "PER 8배로 업종평균 15배 대비 47% 저평가")
+
 ## 응답 형식 (JSON)
 {
   "top5": [
@@ -140,8 +163,8 @@ ${stockList}
       "name": "종목명",
       "score": 4.5,
       "targetPriceMultiplier": 1.25,
-      "reason": "선정 이유 (당신의 분석 스타일로, 구체적 수치 포함, 2-3문장)",
-      "risks": ["리스크1", "리스크2"]
+      "reason": "구체적 수치 기반 분석 (예: 'PER 8.5배로 업종평균 대비 43% 저평가, ROE 22.1%로 수익성 우수, PBR 1.8배는 성장성 고려시 적정') 3-4문장으로 상세히 작성",
+      "risks": ["구체적 리스크1 (예: 반도체 싸이클 하락 시 실적 변동성 30%↑)", "구체적 리스크2"]
     }
   ]
 }
@@ -182,9 +205,16 @@ async function analyzeWithGemini(stocks: typeof ANALYSIS_STOCKS, realPrices: Map
   const prompt = `${profile.systemPrompt}
 
 아래 종목들을 당신의 성장주 투자 관점에서 평가하고, Top 5를 선정해주세요.
+개인투자자들이 좋아하는 고성장 테마주도 적극 검토하세요.
 
 ## 분석 대상 종목
 ${stockList}
+
+## 중요: 분석 시 반드시 다음 근거를 제시하세요
+- 성장률 수치와 섹터 평균 대비 비교 (예: "성장률 85%로 섹터 평균 대비 3배")
+- TAM(전체시장규모) 추정 및 점유율 확대 가능성
+- 기술 트렌드 연관성 (AI, 로봇, 2차전지, 바이오 등)
+- 구체적인 upside 계산 근거
 
 ## 응답 형식 (JSON)
 {
@@ -195,8 +225,8 @@ ${stockList}
       "name": "종목명",
       "score": 5.0,
       "targetPriceMultiplier": 1.45,
-      "reason": "선정 이유 (당신의 스타일로, 미래 성장성 강조, 영어 표현 섞어서, 2-3문장)",
-      "risks": ["리스크1", "리스크2"]
+      "reason": "구체적 성장 근거 (예: '2차전지 소재 시장 TAM 50조원, 점유율 15%→25% 확대 전망, 성장률 85%로 섹터 최고 수준. This is THE play!') 영어 표현 섞어서 3-4문장",
+      "risks": ["구체적 리스크 (예: 중국 업체 가격경쟁으로 마진 압박 예상)", "리스크2"]
     }
   ]
 }
@@ -232,9 +262,16 @@ async function analyzeWithGPT(stocks: typeof ANALYSIS_STOCKS, realPrices: Map<st
   }).join('\n');
 
   const prompt = `아래 종목들을 당신의 리스크 관리 관점에서 평가하고, Top 5를 선정해주세요.
+안전한 배당주와 함께 적절한 성장주도 균형있게 검토하세요.
 
 ## 분석 대상 종목
 ${stockList}
+
+## 중요: 분석 시 반드시 다음 근거를 제시하세요
+- 배당수익률과 배당 안정성 (예: "5년 연속 배당 증가, 배당수익률 5.1%")
+- 변동성(베타) 지표와 시장 대비 안정성
+- 과거 위기(금융위기, 코로나) 시 주가 하락폭
+- 부채비율과 재무건전성 구체적 수치
 
 ## 응답 형식 (JSON)
 {
@@ -245,8 +282,8 @@ ${stockList}
       "name": "종목명",
       "score": 4.2,
       "targetPriceMultiplier": 1.12,
-      "reason": "선정 이유 (당신의 스타일로, 리스크와 배당 강조, 경험 언급, 2-3문장)",
-      "risks": ["리스크1", "리스크2"]
+      "reason": "구체적 안정성 근거 (예: '배당수익률 5.1%로 시장평균 2배, 5년 연속 배당증가, 2020년 코로나 위기에도 -12% 하락에 그쳐 방어력 입증. 부채비율 45%로 재무건전') 3-4문장으로 상세히",
+      "risks": ["구체적 리스크 (예: 금리 인상 시 대출 마진 축소 가능성)", "리스크2"]
     }
   ]
 }
