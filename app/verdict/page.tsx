@@ -254,24 +254,10 @@ export default function VerdictPage() {
                   );
                 })}
 
-                <div className="flex items-center gap-6 pt-4 border-t border-dark-800">
-                  <div className="flex items-center gap-2">
-                    <span className="badge-success text-xs">Unanimous</span>
-                    <span className="text-sm text-dark-400">= 만장일치 ({data.unanimousCount}개 종목)</span>
-                  </div>
-                </div>
               </div>
 
               {/* Sidebar */}
               <div className="space-y-4 sm:space-y-6">
-                {/* Summary Card */}
-                <div className="card p-4 sm:p-6">
-                  <h3 className="font-semibold text-dark-200 mb-3 sm:mb-4">오늘의 분석 요약</h3>
-                  <p className="text-sm text-dark-400 leading-relaxed">
-                    {data.rationale}
-                  </p>
-                </div>
-
                 {/* AI Analysts */}
                 <div className="card p-4 sm:p-6">
                   <h3 className="font-semibold text-dark-200 mb-3 sm:mb-4">참여 애널리스트</h3>
