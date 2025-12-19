@@ -8,29 +8,67 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '');
 
-// 한국 주식 목록과 현재가 (실제로는 실시간 데이터를 가져와야 함)
-const AVAILABLE_STOCKS = [
-  { code: '005930', name: '삼성전자', sector: '반도체', price: 55800 },
-  { code: '000660', name: 'SK하이닉스', sector: '반도체', price: 178000 },
-  { code: '373220', name: 'LG에너지솔루션', sector: '2차전지', price: 385000 },
-  { code: '207940', name: '삼성바이오로직스', sector: '바이오', price: 782000 },
-  { code: '005380', name: '현대차', sector: '자동차', price: 208000 },
-  { code: '006400', name: '삼성SDI', sector: '2차전지', price: 272000 },
-  { code: '035720', name: '카카오', sector: 'IT서비스', price: 42500 },
-  { code: '035420', name: 'NAVER', sector: 'IT서비스', price: 192000 },
-  { code: '051910', name: 'LG화학', sector: '화학', price: 298000 },
-  { code: '000270', name: '기아', sector: '자동차', price: 94800 },
-  { code: '105560', name: 'KB금융', sector: '금융', price: 82400 },
-  { code: '055550', name: '신한지주', sector: '금융', price: 51200 },
-  { code: '068270', name: '셀트리온', sector: '바이오', price: 178500 },
-  { code: '003670', name: '포스코홀딩스', sector: '철강', price: 298000 },
-  { code: '066570', name: 'LG전자', sector: '가전', price: 98500 },
-  { code: '028260', name: '삼성물산', sector: '건설', price: 125000 },
-  { code: '012330', name: '현대모비스', sector: '자동차부품', price: 245000 },
-  { code: '096770', name: 'SK이노베이션', sector: '에너지', price: 115000 },
-  { code: '034730', name: 'SK', sector: '지주', price: 175000 },
-  { code: '003550', name: 'LG', sector: '지주', price: 78000 },
+// 한국 주식 목록 (가격은 실시간으로 가져옴)
+const STOCK_LIST = [
+  { code: '005930', name: '삼성전자', sector: '반도체' },
+  { code: '000660', name: 'SK하이닉스', sector: '반도체' },
+  { code: '373220', name: 'LG에너지솔루션', sector: '2차전지' },
+  { code: '207940', name: '삼성바이오로직스', sector: '바이오' },
+  { code: '005380', name: '현대차', sector: '자동차' },
+  { code: '006400', name: '삼성SDI', sector: '2차전지' },
+  { code: '035720', name: '카카오', sector: 'IT서비스' },
+  { code: '035420', name: 'NAVER', sector: 'IT서비스' },
+  { code: '051910', name: 'LG화학', sector: '화학' },
+  { code: '000270', name: '기아', sector: '자동차' },
+  { code: '105560', name: 'KB금융', sector: '금융' },
+  { code: '055550', name: '신한지주', sector: '금융' },
+  { code: '068270', name: '셀트리온', sector: '바이오' },
+  { code: '003670', name: '포스코홀딩스', sector: '철강' },
+  { code: '066570', name: 'LG전자', sector: '가전' },
+  { code: '028260', name: '삼성물산', sector: '건설' },
+  { code: '012330', name: '현대모비스', sector: '자동차부품' },
+  { code: '096770', name: 'SK이노베이션', sector: '에너지' },
+  { code: '034730', name: 'SK', sector: '지주' },
+  { code: '003550', name: 'LG', sector: '지주' },
 ];
+
+// 실시간 가격을 포함한 주식 목록을 저장할 변수
+let AVAILABLE_STOCKS: { code: string; name: string; sector: string; price: number }[] = [];
+
+// 실시간 주가 가져오기
+async function fetchRealTimePrices(): Promise<void> {
+  const symbols = STOCK_LIST.map(s => s.code).join(',');
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const res = await fetch(`${baseUrl}/api/stock/price?symbols=${symbols}`, {
+      cache: 'no-store',
+    });
+    const data = await res.json();
+    
+    if (data.success && data.data) {
+      AVAILABLE_STOCKS = STOCK_LIST.map(stock => {
+        const priceData = data.data[stock.code];
+        return {
+          ...stock,
+          price: priceData?.price || 50000, // 기본값 50000원
+        };
+      });
+    } else {
+      // API 실패 시 기본값 사용
+      AVAILABLE_STOCKS = STOCK_LIST.map(stock => ({
+        ...stock,
+        price: 50000,
+      }));
+    }
+  } catch (error) {
+    console.error('Failed to fetch real-time prices:', error);
+    // API 실패 시 기본값 사용
+    AVAILABLE_STOCKS = STOCK_LIST.map(stock => ({
+      ...stock,
+      price: 50000,
+    }));
+  }
+}
 
 interface PortfolioItem {
   code: string;
@@ -59,7 +97,7 @@ interface AIPortfolio {
   strategyDetail: string;
 }
 
-const PORTFOLIO_PROMPT = (amount: number) => `당신은 전문 투자 포트폴리오 매니저입니다. 
+const getPortfolioPrompt = (amount: number) => `당신은 전문 투자 포트폴리오 매니저입니다. 
 투자금 ${amount.toLocaleString()}원으로 한국 주식 포트폴리오를 구성해주세요.
 
 사용 가능한 종목 목록 (종목명, 섹터, 현재가):
@@ -118,7 +156,7 @@ async function generateClaudePortfolio(amount: number): Promise<AIPortfolio | nu
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1024,
       system: CLAUDE_SYSTEM,
-      messages: [{ role: 'user', content: PORTFOLIO_PROMPT(amount) }],
+      messages: [{ role: 'user', content: getPortfolioPrompt(amount) }],
     });
 
     const textBlock = response.content.find(block => block.type === 'text');
@@ -142,7 +180,7 @@ async function generateGeminiPortfolio(amount: number): Promise<AIPortfolio | nu
       systemInstruction: GEMINI_SYSTEM,
     });
 
-    const result = await model.generateContent(PORTFOLIO_PROMPT(amount));
+    const result = await model.generateContent(getPortfolioPrompt(amount));
     const text = result.response.text();
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -162,7 +200,7 @@ async function generateGPTPortfolio(amount: number): Promise<AIPortfolio | null>
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: GPT_SYSTEM },
-        { role: 'user', content: PORTFOLIO_PROMPT(amount) },
+        { role: 'user', content: getPortfolioPrompt(amount) },
       ],
       max_tokens: 1024,
       temperature: 0.7,
@@ -422,6 +460,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    
+    // 실시간 주가 가져오기
+    await fetchRealTimePrices();
     
     const today = new Date().toISOString().split('T')[0];
     
