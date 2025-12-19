@@ -633,9 +633,10 @@ export default function BattlePage() {
     }
   }, [pendingMessages, currentAnimatingId, processNextMessage]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [displayedMessages, currentAnimatingId]);
+  // 자동 스크롤 비활성화
+  // useEffect(() => {
+  //   messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // }, [displayedMessages, currentAnimatingId]);
 
   function handleCharacterClick(char: CharacterInfo) {
     setSelectedCharacter(char);

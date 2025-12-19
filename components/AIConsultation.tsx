@@ -171,9 +171,10 @@ export function AIConsultation({ characterType, holdings = [], stockData, onClos
     };
   }, []);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, displayedGreeting]);
+  // 자동 스크롤 비활성화
+  // useEffect(() => {
+  //   messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // }, [messages, displayedGreeting]);
 
   useEffect(() => {
     if (!isTypingGreeting) {

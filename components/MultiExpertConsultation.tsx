@@ -66,10 +66,10 @@ export function MultiExpertConsultation({
     }
   }, [isOpen, stockData, stockName]);
 
-  // 메시지 추가 시 스크롤
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, currentTypingMessage]);
+  // 자동 스크롤 비활성화
+  // useEffect(() => {
+  //   messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // }, [messages, currentTypingMessage]);
 
   // 초기 분석 요청 (3명 모두)
   const requestInitialAnalysis = async () => {
