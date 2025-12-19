@@ -9,6 +9,13 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '');
 
+// OpenRouter 모델 매핑
+const OPENROUTER_MODELS: Record<string, string> = {
+  claude: 'anthropic/claude-sonnet-4',
+  gemini: 'google/gemini-2.0-flash-exp:free',
+  gpt: 'openai/gpt-4o',
+};
+
 // 분석 대상 종목 목록 (대형주 + 중소형주 + 테마주 다양화)
 const ANALYSIS_STOCKS = [
   // === 대형주 ===
@@ -312,6 +319,97 @@ ${stockList}
   return [];
 }
 
+// OpenRouter API 호출
+async function analyzeWithOpenRouter(
+  heroId: string,
+  stocks: typeof ANALYSIS_STOCKS,
+  realPrices: Map<string, any>
+): Promise<any[]> {
+  const profile = CHARACTER_PROFILES[heroId as keyof typeof CHARACTER_PROFILES];
+  if (!profile) return [];
+  
+  const model = OPENROUTER_MODELS[heroId];
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  
+  if (!apiKey || !model) {
+    console.error('[OpenRouter] API key or model not configured');
+    return [];
+  }
+  
+  console.log(`[OpenRouter] Analyzing with ${model} for ${heroId}...`);
+  
+  const stockList = stocks.map(s => {
+    const realPrice = realPrices.get(s.symbol);
+    return `- ${s.name}(${s.symbol}): 현재가 ${realPrice?.price?.toLocaleString() || 'N/A'}원, 등락 ${realPrice?.changePercent?.toFixed(2) || 0}%, PER ${s.per}, PBR ${s.pbr}, ROE ${s.roe}%, 배당 ${s.dividend}%, 성장률 ${s.growth}%, 섹터: ${s.sector}, 시가총액: ${s.marketCap}`;
+  }).join('\n');
+
+  const prompt = `아래 종목들을 당신의 투자 관점에서 평가하고, Top 5를 선정해주세요.
+개인투자자들이 좋아하는 고성장 테마주도 적극 검토하세요.
+
+## 분석 대상 종목
+${stockList}
+
+## 중요: 분석 시 반드시 구체적 수치와 근거를 제시하세요
+- PER/PBR 수치와 업종 평균 대비 저/고평가
+- 성장률과 섹터 트렌드
+- 구체적인 리스크 요인
+
+## 응답 형식 (JSON만 응답)
+{
+  "top5": [
+    {
+      "rank": 1,
+      "symbol": "종목코드",
+      "name": "종목명",
+      "score": 4.5,
+      "targetPriceMultiplier": 1.25,
+      "reason": "구체적 수치 기반 분석 3-4문장",
+      "risks": ["구체적 리스크1", "구체적 리스크2"]
+    }
+  ]
+}`;
+
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': process.env.NEXT_PUBLIC_SITE_URL || 'https://stockhero.app',
+        'X-Title': 'StockHero AI Analysis',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: profile.systemPrompt },
+          { role: 'user', content: prompt },
+        ],
+        max_tokens: 2048,
+        temperature: 0.7,
+      }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(`[OpenRouter] API error: ${response.status}`, error);
+      return [];
+    }
+    
+    const data = await response.json();
+    const text = data.choices?.[0]?.message?.content || '';
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    
+    if (jsonMatch) {
+      const result = JSON.parse(jsonMatch[0]).top5;
+      console.log(`[OpenRouter] Successfully parsed ${result.length} stocks`);
+      return result;
+    }
+  } catch (error) {
+    console.error('[OpenRouter] Analysis error:', error);
+  }
+  return [];
+}
+
 // 폴백 데이터 (AI 실패 시)
 function getFallbackRecommendations(heroId: string): any[] {
   const fallbacks: Record<string, any[]> = {
@@ -364,18 +462,26 @@ export async function GET(
   
   // 2. AI 분석 수행
   let top5: any[] = [];
+  const useOpenRouter = !!process.env.OPENROUTER_API_KEY;
   
   try {
-    switch (heroId) {
-      case 'claude':
-        top5 = await analyzeWithClaude(ANALYSIS_STOCKS, realPrices);
-        break;
-      case 'gemini':
-        top5 = await analyzeWithGemini(ANALYSIS_STOCKS, realPrices);
-        break;
-      case 'gpt':
-        top5 = await analyzeWithGPT(ANALYSIS_STOCKS, realPrices);
-        break;
+    if (useOpenRouter) {
+      // OpenRouter 사용 (모든 모델을 하나의 API로)
+      console.log(`[${heroId}] Using OpenRouter for analysis`);
+      top5 = await analyzeWithOpenRouter(heroId, ANALYSIS_STOCKS, realPrices);
+    } else {
+      // 개별 API 사용
+      switch (heroId) {
+        case 'claude':
+          top5 = await analyzeWithClaude(ANALYSIS_STOCKS, realPrices);
+          break;
+        case 'gemini':
+          top5 = await analyzeWithGemini(ANALYSIS_STOCKS, realPrices);
+          break;
+        case 'gpt':
+          top5 = await analyzeWithGPT(ANALYSIS_STOCKS, realPrices);
+          break;
+      }
     }
   } catch (error) {
     console.error(`AI analysis failed for ${heroId}:`, error);

@@ -5,6 +5,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getSystemPromptWithHoldings, AI_PERSONAS } from '@/lib/ai-personas';
 import type { CharacterType } from '@/lib/llm/types';
 import { getMarketContext, searchStockNews } from '@/lib/market-data/news';
+import { chatWithOpenRouter } from '@/lib/llm/openrouter';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -584,21 +585,28 @@ This is where it gets interesting! 성장주 관점에서 보면, 미래 성장 
     };
 
     try {
-      switch (characterType) {
-        case 'claude':
-          responseContent = await chatWithClaude(systemPrompt, conversationMessages);
-          break;
-        case 'gemini':
-          responseContent = await chatWithGemini(systemPrompt, conversationMessages);
-          break;
-        case 'gpt':
-          responseContent = await chatWithGPT(systemPrompt, conversationMessages);
-          break;
-        default:
-          return NextResponse.json(
-            { success: false, error: 'Unknown character type' },
-            { status: 400 }
-          );
+      // OpenRouter가 설정되어 있으면 우선 사용
+      const useOpenRouter = !!process.env.OPENROUTER_API_KEY;
+      
+      if (useOpenRouter) {
+        responseContent = await chatWithOpenRouter(characterType, systemPrompt, conversationMessages);
+      } else {
+        switch (characterType) {
+          case 'claude':
+            responseContent = await chatWithClaude(systemPrompt, conversationMessages);
+            break;
+          case 'gemini':
+            responseContent = await chatWithGemini(systemPrompt, conversationMessages);
+            break;
+          case 'gpt':
+            responseContent = await chatWithGPT(systemPrompt, conversationMessages);
+            break;
+          default:
+            return NextResponse.json(
+              { success: false, error: 'Unknown character type' },
+              { status: 400 }
+            );
+        }
       }
     } catch (apiError) {
       console.error(`${characterType} API failed, using fallback response:`, apiError);
