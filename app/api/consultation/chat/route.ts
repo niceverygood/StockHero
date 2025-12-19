@@ -477,30 +477,51 @@ ${stockData.volume ? `- **거래량**: ${stockData.volume.toLocaleString()}주` 
       );
     }
 
+    // 오늘 날짜 추가 (AI가 현재 시점 인지)
+    const today = new Date();
+    const todayStr = today.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+    systemPrompt += `\n\n## 📅 현재 날짜: ${todayStr}\n`;
+
     // 최신 이슈/뉴스 감지 및 컨텍스트 추가
     const lastUserMessage = conversationMessages.filter(m => m.role === 'user').pop()?.content || '';
-    const newsKeywords = ['최근', '요즘', '이슈', '뉴스', '소식', '발표', '분할', '상장', '공시', '실적', '합병', '인수', '배당'];
-    const needsNewsContext = newsKeywords.some(kw => lastUserMessage.includes(kw));
+    const newsKeywords = [
+      '최근', '요즘', '이슈', '뉴스', '소식', '발표', '분할', '상장', '공시', '실적', 
+      '합병', '인수', '배당', '올해', '이번', '지금', '현재', '어제', '오늘', '분기',
+      '공모', '상폐', 'IPO', '자사주', '유상증자', '무상증자', '분사', '스핀오프'
+    ];
+    const needsNewsContext = newsKeywords.some(kw => lastUserMessage.includes(kw)) || isInitialAnalysis;
     
     // 종목명 또는 키워드 추출
-    const stockNameMatch = lastUserMessage.match(/([가-힣]+(?:전자|홀딩스|바이오|에너지|금융|지주|화학|에피스)?)/);
+    const stockNameMatch = lastUserMessage.match(/([가-힣]+(?:전자|홀딩스|바이오|에너지|금융|지주|화학|에피스|소프트|텍|네트웍스|모비스|솔루션)?)/);
     const queryKeyword = stockNameMatch?.[1] || stockData?.name || '';
     
-    if (needsNewsContext && queryKeyword) {
+    // 초기 분석이거나 뉴스 키워드가 있으면 항상 뉴스 가져오기
+    if ((needsNewsContext || isInitialAnalysis) && queryKeyword) {
       try {
-        const newsItems = await searchStockNews(queryKeyword, 3);
+        const newsItems = await searchStockNews(queryKeyword, 5);
         if (newsItems.length > 0) {
           systemPrompt += `
+## 📰 ${queryKeyword} 관련 최신 뉴스 (${todayStr} 기준)
+${newsItems.map((n, i) => `${i+1}. ${n.title} (${n.source || '출처미상'})`).join('\n')}
 
-## 📰 최신 뉴스 (${new Date().toLocaleDateString('ko-KR')})
-${newsItems.map(n => `- ${n.title}`).join('\n')}
-
-⚠️ 위 뉴스 정보를 참고하여 최신 이슈를 반영한 답변을 제공하세요. 
-모르는 정보는 "최신 공시나 뉴스를 확인해보시길 권합니다"라고 안내하세요.
+⚠️ **중요**: 위 뉴스 정보를 반드시 참고하여 최신 이슈를 반영한 답변을 제공하세요.
+- 뉴스에 언급된 이벤트(분할상장, 실적발표, 인수합병 등)가 있다면 반드시 언급하세요.
+- 모르는 정보는 솔직히 "해당 정보는 실시간으로 확인이 필요합니다"라고 안내하세요.
+- 학습 데이터 이후 발생한 이벤트는 뉴스를 기반으로 답변하세요.
+`;
+        } else {
+          systemPrompt += `
+## 📰 뉴스 조회 결과
+${queryKeyword} 관련 최신 뉴스를 찾지 못했습니다.
+⚠️ 최신 이슈에 대해 질문받으면 "최신 공시나 뉴스를 직접 확인해보시길 권합니다"라고 안내하세요.
 `;
         }
       } catch (error) {
         console.log('News fetch failed, continuing without context:', error);
+        systemPrompt += `
+## ⚠️ 뉴스 조회 실패
+최신 뉴스를 가져오지 못했습니다. 최신 이슈에 대해서는 신중하게 답변하세요.
+`;
       }
     }
 

@@ -344,15 +344,25 @@ async function analyzeWithOpenRouter(
   }).join('\n');
 
   const prompt = `아래 종목들을 당신의 투자 관점에서 평가하고, Top 5를 선정해주세요.
-개인투자자들이 좋아하는 고성장 테마주도 적극 검토하세요.
+
+## 🚨 필수 요구사항 (반드시 준수)
+1. **대형주 2개 + 중소형/테마주 3개** 조합 필수
+2. 개인투자자가 선호하는 고변동성 테마주 (AI/로봇, 2차전지, 바이오) 포함
+3. 모든 분석에 **구체적인 숫자** 인용 필수
 
 ## 분석 대상 종목
 ${stockList}
 
-## 중요: 분석 시 반드시 구체적 수치와 근거를 제시하세요
-- PER/PBR 수치와 업종 평균 대비 저/고평가
-- 성장률과 섹터 트렌드
-- 구체적인 리스크 요인
+## 분석 시 반드시 포함할 구체적 수치 (예시)
+✅ 좋은 예: "PER 8.5배로 반도체 업종 평균 15배 대비 43% 저평가, ROE 22%로 수익성 우수"
+✅ 좋은 예: "매출 성장률 85%로 2차전지 업종 내 Top 3, 다만 PBR 12.5배로 밸류에이션 부담"
+❌ 나쁜 예: "펀더멘털이 견고하다" (수치 없음)
+❌ 나쁜 예: "성장 잠재력이 높다" (근거 없음)
+
+## 리스크 분석도 구체적으로
+✅ 좋은 예: "부채비율 120% → 금리 상승 시 이자비용 연 500억 증가 예상"
+✅ 좋은 예: "중국 경쟁사 가격 30% 인하 → 시장점유율 하락 우려"
+❌ 나쁜 예: "시장 변동성" (너무 추상적)
 
 ## 응답 형식 (JSON만 응답)
 {
@@ -363,11 +373,18 @@ ${stockList}
       "name": "종목명",
       "score": 4.5,
       "targetPriceMultiplier": 1.25,
-      "reason": "구체적 수치 기반 분석 3-4문장",
-      "risks": ["구체적 리스크1", "구체적 리스크2"]
+      "reason": "PER X배(업종평균 대비 X% 저평가), ROE X%, 성장률 X% 등 수치 기반 분석 3-4문장",
+      "risks": ["구체적 수치 포함 리스크1", "구체적 수치 포함 리스크2"]
     }
   ]
-}`;
+}
+
+## targetPriceMultiplier 설명
+- 현재가 대비 목표가 배수입니다
+- 예: 1.20 = 현재가 대비 +20% 상승 목표
+- 예: 1.35 = 현재가 대비 +35% 상승 목표
+- 범위: 1.05 ~ 1.50 (5%~50% 상승)
+- ⚠️ 절대값(예: 50000)이 아닌 배수(예: 1.25)로 입력하세요!`;
 
   try {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -478,19 +495,46 @@ export async function GET(
   
   console.log(`[${heroId}] AI analysis successful, got ${top5.length} stocks`);
   
-  // 4. 실시간 가격 병합
+  // 4. 실시간 가격 병합 + 목표가 검증
   const stocksWithPrices = top5.map((stock, idx) => {
     const realPrice = realPrices.get(stock.symbol);
     const currentPrice = realPrice?.price || 0;
-    const targetPrice = Math.round(currentPrice * (stock.targetPriceMultiplier || 1.2));
     const stockInfo = ANALYSIS_STOCKS.find(s => s.symbol === stock.symbol);
+    
+    // 목표가 검증 로직
+    let multiplier = stock.targetPriceMultiplier || 1.2;
+    
+    // AI가 절대값을 반환한 경우 (예: 92200 대신 1.25)
+    if (multiplier > 10) {
+      // 절대값으로 판단 → 배수로 변환
+      if (currentPrice > 0) {
+        multiplier = multiplier / currentPrice;
+        console.warn(`[${stock.symbol}] AI returned absolute price ${stock.targetPriceMultiplier}, converted to multiplier ${multiplier.toFixed(2)}`);
+      }
+    }
+    
+    // 배수 범위 검증 (5% ~ 50% 상승)
+    if (multiplier < 1.05) {
+      console.warn(`[${stock.symbol}] Multiplier too low (${multiplier}), adjusted to 1.10`);
+      multiplier = 1.10;
+    }
+    if (multiplier > 1.50) {
+      console.warn(`[${stock.symbol}] Multiplier too high (${multiplier}), adjusted to 1.40`);
+      multiplier = 1.40;
+    }
+    
+    const targetPrice = Math.round(currentPrice * multiplier);
+    
+    // 최종 검증: 목표가가 현재가보다 낮으면 안 됨
+    const finalTargetPrice = targetPrice > currentPrice ? targetPrice : Math.round(currentPrice * 1.15);
     
     return {
       rank: stock.rank || idx + 1,
       symbol: stock.symbol,
       name: stockInfo?.name || stock.name,
       currentPrice,
-      targetPrice,
+      targetPrice: finalTargetPrice,
+      expectedReturn: ((finalTargetPrice / currentPrice - 1) * 100).toFixed(1) + '%',
       change: realPrice?.change || 0,
       changePercent: realPrice?.changePercent || 0,
       score: stock.score,

@@ -276,11 +276,13 @@ export function VerdictDetail({ date, verdict, onGenerateClick, isGenerating }: 
   const [debateMessages, setDebateMessages] = useState<DebateMessage[]>([]);
   const [loadingDebate, setLoadingDebate] = useState(false);
 
-  // 날짜가 변경되면 선택된 종목 초기화
+  // 날짜가 변경되면 선택된 종목 및 모든 상태 초기화
   useEffect(() => {
+    console.log('[VerdictDetail] Date changed to:', date, '- resetting all state');
     setSelectedStock(null);
     setDebateMessages([]);
     setSelectedSector('all');
+    setLoadingDebate(false);
   }, [date]);
 
   const today = new Date();

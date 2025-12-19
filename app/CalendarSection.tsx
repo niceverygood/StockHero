@@ -76,10 +76,11 @@ export function CalendarSection() {
             <Calendar onDateSelect={handleDateSelect} />
           </div>
 
-          {/* Detail Panel */}
+          {/* Detail Panel - key로 날짜 변경 시 컴포넌트 완전 재렌더링 */}
           <div className="w-full lg:w-1/3">
             {selectedDate ? (
               <VerdictDetail
+                key={selectedDate}
                 date={selectedDate}
                 verdict={selectedVerdict}
                 onGenerateClick={handleGenerateToday}
