@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { KISMarketDataProvider, fetchMultipleStockPrices } from '@/lib/market-data/kis';
-import { MockMarketDataProvider } from '@/lib/market-data/mock';
+import { NaverMarketDataProvider, fetchMultipleNaverPrices } from '@/lib/market-data/naver';
 
 // KIS API 사용 여부 확인
 const useKISAPI = !!(process.env.KIS_APP_KEY && process.env.KIS_APP_SECRET);
@@ -39,14 +39,24 @@ export async function GET(request: NextRequest) {
           },
         });
       } else {
-        // Mock 데이터 사용
-        const provider = new MockMarketDataProvider();
+        // 네이버 금융 사용 (실시간)
+        const provider = new NaverMarketDataProvider();
         const quote = await provider.getQuote(symbol);
         
         return NextResponse.json({
           success: true,
-          source: 'mock',
-          data: quote,
+          source: 'naver',
+          data: {
+            symbol: quote.symbol,
+            name: quote.name,
+            price: quote.price,
+            change: quote.change,
+            changePercent: quote.changePercent,
+            volume: quote.volume,
+            high52Week: quote.high52Week,
+            low52Week: quote.low52Week,
+            updatedAt: quote.updatedAt,
+          },
         });
       }
     }
@@ -81,8 +91,8 @@ export async function GET(request: NextRequest) {
           data,
         });
       } else {
-        // Mock 데이터 사용
-        const provider = new MockMarketDataProvider();
+        // 네이버 금융 사용 (실시간)
+        const results = await fetchMultipleNaverPrices(symbols);
         const data: Record<string, {
           price: number;
           change: number;
@@ -90,23 +100,13 @@ export async function GET(request: NextRequest) {
           name: string;
         }> = {};
         
-        for (const sym of symbols) {
-          try {
-            const quote = await provider.getQuote(sym);
-            data[sym] = {
-              price: quote.price,
-              change: quote.change,
-              changePercent: quote.changePercent,
-              name: quote.name,
-            };
-          } catch {
-            // 개별 종목 실패 시 스킵
-          }
-        }
+        results.forEach((value, key) => {
+          data[key] = value;
+        });
         
         return NextResponse.json({
           success: true,
-          source: 'mock',
+          source: 'naver',
           data,
         });
       }
@@ -120,19 +120,27 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Stock price API error:', error);
     
-    // KIS API 실패 시 Mock으로 폴백
-    if (useKISAPI && symbol) {
+    // API 실패 시 네이버로 폴백
+    if (symbol) {
       try {
-        const provider = new MockMarketDataProvider();
+        const provider = new NaverMarketDataProvider();
         const quote = await provider.getQuote(symbol);
         
         return NextResponse.json({
           success: true,
-          source: 'mock_fallback',
-          data: quote,
+          source: 'naver_fallback',
+          data: {
+            symbol: quote.symbol,
+            name: quote.name,
+            price: quote.price,
+            change: quote.change,
+            changePercent: quote.changePercent,
+            volume: quote.volume,
+            updatedAt: quote.updatedAt,
+          },
         });
       } catch {
-        // Mock도 실패
+        // 네이버도 실패
       }
     }
     
