@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { DisclaimerBar, Header, CharacterAvatar, AIConsultationModal } from '@/components';
+import { DisclaimerBar, Header, CharacterAvatar, AIConsultationModal, MissedProfitCalculator } from '@/components';
 import { CHARACTERS } from '@/lib/characters';
 import { CalendarSection } from './CalendarSection';
 import type { CharacterType } from '@/lib/llm/types';
@@ -67,6 +67,15 @@ export default function HomePage() {
 
         {/* Calendar Section */}
         <CalendarSection />
+
+        {/* Missed Profit Calculator - FOMO Section */}
+        <section className="relative py-16">
+          <div className="container-app">
+            <div className="max-w-3xl mx-auto">
+              <MissedProfitCalculator />
+            </div>
+          </div>
+        </section>
 
         {/* AI Characters Section */}
         <section className="relative py-24 border-t border-dark-800/50">

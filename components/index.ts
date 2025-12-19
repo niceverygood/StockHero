@@ -19,3 +19,4 @@ export { WatchlistButton } from './WatchlistButton';
 export { MyPortfolioViewer, PortfolioUploader } from './MyPortfolio';
 export { FeedComposer, FeedList, PostCard, FollowButton } from './Community';
 export { StockSearchModal } from './StockSearchModal';
+export { MissedProfitCalculator } from './MissedProfitCalculator';
