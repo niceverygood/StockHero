@@ -162,14 +162,17 @@ export function CharacterDetailModal({ character, isOpen, onClose, holdings = []
             <div className="px-6 pt-6">
               <button
                 onClick={() => setShowConsultation(true)}
-                className={`w-full py-4 px-6 rounded-xl bg-gradient-to-r ${character.gradient} text-white font-semibold flex items-center justify-center gap-3 hover:opacity-90 transition-opacity shadow-lg`}
+                className={`w-full py-5 px-6 rounded-2xl bg-gradient-to-r ${character.gradient} text-white font-bold text-lg flex items-center justify-center gap-3 hover:scale-[1.02] hover:shadow-2xl transition-all duration-200 shadow-xl ring-2 ring-white/20 animate-pulse-slow`}
+                style={{
+                  boxShadow: `0 8px 32px rgba(99, 102, 241, 0.4), 0 4px 16px rgba(0, 0, 0, 0.3)`
+                }}
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
-                {character.name}에게 보유종목 상담받기
+                💬 {character.name}에게 보유종목 상담받기
                 {holdings.length > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-white/20 text-xs">
+                  <span className="px-2 py-0.5 rounded-full bg-white/30 text-sm font-medium">
                     {holdings.length}종목 연동
                   </span>
                 )}
