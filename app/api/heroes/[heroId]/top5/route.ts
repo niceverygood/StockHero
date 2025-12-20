@@ -1,8 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchMultipleStockPrices } from '@/lib/market-data/kis';
+import { fetchMultipleNaverPrices } from '@/lib/market-data/naver';
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// API 사용 여부 확인
+const useKISAPI = !!(process.env.KIS_APP_KEY && process.env.KIS_APP_SECRET);
+
+// 여러 종목 가격 조회 (KIS -> Naver 폴백)
+async function fetchPricesWithFallback(symbols: string[]): Promise<Map<string, any>> {
+  // 1. KIS API 시도
+  if (useKISAPI) {
+    try {
+      const results = await fetchMultipleStockPrices(symbols);
+      if (results.size > 0) {
+        console.log('[Top5] Using KIS API for prices');
+        return results;
+      }
+    } catch (error) {
+      console.warn('[Top5] KIS API failed, falling back to Naver:', error);
+    }
+  }
+  
+  // 2. 네이버 금융 폴백
+  console.log('[Top5] Using Naver Finance for prices');
+  return await fetchMultipleNaverPrices(symbols);
+}
 
 // AI 클라이언트 초기화
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
@@ -446,7 +470,7 @@ export async function GET(
   let realPrices: Map<string, any> = new Map();
   
   try {
-    realPrices = await fetchMultipleStockPrices(symbols);
+    realPrices = await fetchPricesWithFallback(symbols);
   } catch (error) {
     console.error('Failed to fetch real-time prices:', error);
   }

@@ -289,14 +289,25 @@ function buildPortfolio(
     };
   }).filter(h => h.shares > 0); // 주식 수가 0인 경우 제외
 
+  // 실제 투자 금액 기반으로 현금 비중 재계산
+  const totalInvested = holdings.reduce((sum, h) => sum + h.amount, 0);
+  const actualCashAmount = amount - totalInvested;
+  const actualCashWeight = Number(((actualCashAmount / amount) * 100).toFixed(1));
+
+  // 각 종목의 실제 비중도 재계산
+  const holdingsWithActualWeight = holdings.map(h => ({
+    ...h,
+    weight: Number(((h.amount / amount) * 100).toFixed(1)),
+  }));
+
   return {
     character,
     characterName,
-    cashWeight: Number(cashWeight.toFixed(1)),
-    cashAmount,
+    cashWeight: actualCashWeight,
+    cashAmount: actualCashAmount,
     cashReason: data.cashReason || '시장 변동성 대비 및 추가 매수 여력 확보',
-    holdings,
-    totalInvested: holdings.reduce((sum, h) => sum + h.amount, 0),
+    holdings: holdingsWithActualWeight,
+    totalInvested,
     riskLevel: data.riskLevel || 'balanced',
     strategy: data.strategy,
     strategyDetail: data.strategyDetail || '',
@@ -436,14 +447,25 @@ function generateFallbackPortfolio(
     };
   }).filter(h => h.shares > 0);
 
+  // 실제 투자 금액 기반으로 현금 비중 재계산
+  const totalInvested = holdings.reduce((sum, h) => sum + h.amount, 0);
+  const actualCashAmount = amount - totalInvested;
+  const actualCashWeight = Number(((actualCashAmount / amount) * 100).toFixed(1));
+
+  // 각 종목의 실제 비중도 재계산
+  const holdingsWithActualWeight = holdings.map(h => ({
+    ...h,
+    weight: Number(((h.amount / amount) * 100).toFixed(1)),
+  }));
+
   return {
     character,
     characterName,
-    cashWeight: config.cashWeight,
-    cashAmount,
+    cashWeight: actualCashWeight,
+    cashAmount: actualCashAmount,
     cashReason: config.cashReason,
-    holdings,
-    totalInvested: holdings.reduce((sum, h) => sum + h.amount, 0),
+    holdings: holdingsWithActualWeight,
+    totalInvested,
     riskLevel: config.riskLevel,
     strategy: config.strategy,
     strategyDetail: config.strategyDetail,

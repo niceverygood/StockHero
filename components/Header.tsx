@@ -8,6 +8,7 @@ import { UserMenu } from './UserMenu';
 const NAV_LINKS = [
   { href: '/verdict', label: 'Top 5' },
   { href: '/heroes', label: 'Stock Heros' },
+  { href: '/us-stocks', label: '🇺🇸 US Stocks' },
   { href: '/battle/005930', label: 'Watch Debate' },
   { href: '/consulting', label: 'Consulting' },
   { href: '/archive', label: 'Archive' },

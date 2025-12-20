@@ -8,7 +8,7 @@ import type { MarketDataProvider, StockQuote, StockFinancials, StockNews } from 
 
 const KIS_BASE_URL = 'https://openapi.koreainvestment.com:9443';
 
-// 종목명 매핑 (API에서 이름을 못 가져올 경우 사용)
+// 한국 종목명 매핑 (API에서 이름을 못 가져올 경우 사용)
 const STOCK_NAMES: Record<string, string> = {
   '005930': '삼성전자',
   '000660': 'SK하이닉스',
@@ -34,6 +34,77 @@ const STOCK_NAMES: Record<string, string> = {
   '030200': 'KT',
   '032830': '삼성생명',
   '247540': '에코프로비엠',
+};
+
+// 미국 종목명 매핑
+const US_STOCK_NAMES: Record<string, string> = {
+  'AAPL': 'Apple',
+  'MSFT': 'Microsoft',
+  'GOOGL': 'Alphabet (Google)',
+  'AMZN': 'Amazon',
+  'NVDA': 'NVIDIA',
+  'META': 'Meta (Facebook)',
+  'TSLA': 'Tesla',
+  'TSM': 'TSMC',
+  'AVGO': 'Broadcom',
+  'AMD': 'AMD',
+  'NFLX': 'Netflix',
+  'INTC': 'Intel',
+  'QCOM': 'Qualcomm',
+  'COST': 'Costco',
+  'PEP': 'PepsiCo',
+  'ADBE': 'Adobe',
+  'CSCO': 'Cisco',
+  'CRM': 'Salesforce',
+  'ORCL': 'Oracle',
+  'IBM': 'IBM',
+  'JPM': 'JPMorgan Chase',
+  'V': 'Visa',
+  'MA': 'Mastercard',
+  'BAC': 'Bank of America',
+  'WMT': 'Walmart',
+  'KO': 'Coca-Cola',
+  'DIS': 'Disney',
+  'NKE': 'Nike',
+  'MCD': 'McDonald\'s',
+  'BA': 'Boeing',
+  'CAT': 'Caterpillar',
+  'GS': 'Goldman Sachs',
+  'MMM': '3M',
+  'JNJ': 'Johnson & Johnson',
+  'PFE': 'Pfizer',
+  'UNH': 'UnitedHealth',
+  'MRK': 'Merck',
+  'ABBV': 'AbbVie',
+  'LLY': 'Eli Lilly',
+  'XOM': 'Exxon Mobil',
+  'CVX': 'Chevron',
+  'HD': 'Home Depot',
+  'LOW': 'Lowe\'s',
+  'TGT': 'Target',
+  'SBUX': 'Starbucks',
+  'COIN': 'Coinbase',
+  'PLTR': 'Palantir',
+  'SOFI': 'SoFi',
+  'RIVN': 'Rivian',
+  'LCID': 'Lucid Motors',
+};
+
+// 미국 거래소 코드 매핑
+const US_EXCHANGE_MAP: Record<string, string> = {
+  // 나스닥 (NAS)
+  'AAPL': 'NAS', 'MSFT': 'NAS', 'GOOGL': 'NAS', 'AMZN': 'NAS', 'NVDA': 'NAS',
+  'META': 'NAS', 'TSLA': 'NAS', 'AVGO': 'NAS', 'AMD': 'NAS', 'NFLX': 'NAS',
+  'INTC': 'NAS', 'QCOM': 'NAS', 'COST': 'NAS', 'PEP': 'NAS', 'ADBE': 'NAS',
+  'CSCO': 'NAS', 'CRM': 'NAS', 'ORCL': 'NAS', 'COIN': 'NAS', 'PLTR': 'NAS',
+  'SOFI': 'NAS', 'RIVN': 'NAS', 'LCID': 'NAS', 'SBUX': 'NAS',
+  // 뉴욕증권거래소 (NYS)
+  'TSM': 'NYS', 'JPM': 'NYS', 'V': 'NYS', 'MA': 'NYS', 'BAC': 'NYS',
+  'WMT': 'NYS', 'KO': 'NYS', 'DIS': 'NYS', 'NKE': 'NYS', 'MCD': 'NYS',
+  'BA': 'NYS', 'CAT': 'NYS', 'GS': 'NYS', 'MMM': 'NYS', 'JNJ': 'NYS',
+  'PFE': 'NYS', 'UNH': 'NYS', 'MRK': 'NYS', 'ABBV': 'NYS', 'LLY': 'NYS',
+  'XOM': 'NYS', 'CVX': 'NYS', 'HD': 'NYS', 'LOW': 'NYS', 'TGT': 'NYS',
+  'IBM': 'NYS',
 };
 
 // 토큰 캐시
@@ -155,6 +226,119 @@ async function fetchStockPrice(symbol: string): Promise<{
     high52Week: parseInt(output.w52_hgpr) || 0, // 52주최고가
     low52Week: parseInt(output.w52_lwpr) || 0, // 52주최저가
   };
+}
+
+/**
+ * 미국주식 현재가 조회 (해외주식현재가/해외주식 현재가상세)
+ */
+export async function fetchUSStockPrice(symbol: string): Promise<{
+  price: number;
+  change: number;
+  changePercent: number;
+  volume: number;
+  high: number;
+  low: number;
+  open: number;
+  name: string;
+  exchange: string;
+}> {
+  const appKey = process.env.KIS_APP_KEY;
+  const appSecret = process.env.KIS_APP_SECRET;
+
+  if (!appKey || !appSecret) {
+    throw new Error('KIS API credentials not configured');
+  }
+
+  const token = await getAccessToken();
+  
+  // 거래소 코드 결정 (기본값: 나스닥)
+  const exchange = US_EXCHANGE_MAP[symbol.toUpperCase()] || 'NAS';
+  const upperSymbol = symbol.toUpperCase();
+
+  // 해외주식 현재가 API
+  const response = await fetch(
+    `${KIS_BASE_URL}/uapi/overseas-price/v1/quotations/price?AUTH=&EXCD=${exchange}&SYMB=${upperSymbol}`,
+    {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'authorization': `Bearer ${token}`,
+        'appkey': appKey,
+        'appsecret': appSecret,
+        'tr_id': 'HHDFS00000300', // 해외주식 현재가
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('KIS US Stock Price Error:', error);
+    throw new Error(`Failed to fetch US stock price: ${response.status}`);
+  }
+
+  const data = await response.json();
+  
+  if (data.rt_cd !== '0') {
+    console.error('KIS US Stock API Error:', data.msg1);
+    throw new Error(`KIS API Error: ${data.msg1}`);
+  }
+
+  const output = data.output;
+  
+  return {
+    name: US_STOCK_NAMES[upperSymbol] || output.rsym || upperSymbol,
+    price: parseFloat(output.last) || 0, // 현재가
+    change: parseFloat(output.diff) || 0, // 전일대비
+    changePercent: parseFloat(output.rate) || 0, // 전일대비율
+    volume: parseInt(output.tvol) || 0, // 거래량
+    high: parseFloat(output.high) || 0, // 고가
+    low: parseFloat(output.low) || 0, // 저가
+    open: parseFloat(output.open) || 0, // 시가
+    exchange,
+  };
+}
+
+/**
+ * 여러 미국 종목의 현재가를 한번에 조회
+ */
+export async function fetchMultipleUSStockPrices(symbols: string[]): Promise<Map<string, {
+  price: number;
+  change: number;
+  changePercent: number;
+  name: string;
+  exchange: string;
+}>> {
+  const results = new Map();
+  
+  // 병렬로 조회 (최대 5개씩)
+  const chunks = [];
+  for (let i = 0; i < symbols.length; i += 5) {
+    chunks.push(symbols.slice(i, i + 5));
+  }
+  
+  for (const chunk of chunks) {
+    const promises = chunk.map(async (symbol) => {
+      try {
+        const data = await fetchUSStockPrice(symbol);
+        results.set(symbol.toUpperCase(), {
+          price: data.price,
+          change: data.change,
+          changePercent: data.changePercent,
+          name: data.name,
+          exchange: data.exchange,
+        });
+      } catch (error) {
+        console.error(`Failed to fetch US stock ${symbol}:`, error);
+      }
+    });
+    
+    await Promise.all(promises);
+    
+    // API 호출 제한을 위해 약간의 딜레이
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  
+  return results;
 }
 
 /**
