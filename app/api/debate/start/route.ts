@@ -3,7 +3,7 @@ import { createDebateSession, getSymbolByCode } from '@/lib/supabase';
 
 // Fallback symbol lookup
 const MOCK_SYMBOLS: Record<string, { name: string; sector: string }> = {
-  // Korean stocks
+  // Korean stocks - 시가총액 상위
   '005930': { name: '삼성전자', sector: '반도체' },
   '000660': { name: 'SK하이닉스', sector: '반도체' },
   '373220': { name: 'LG에너지솔루션', sector: '2차전지' },
@@ -12,6 +12,32 @@ const MOCK_SYMBOLS: Record<string, { name: string; sector: string }> = {
   '006400': { name: '삼성SDI', sector: '2차전지' },
   '035720': { name: '카카오', sector: 'IT서비스' },
   '035420': { name: 'NAVER', sector: 'IT서비스' },
+  // Korean stocks - 금융
+  '086790': { name: '하나금융지주', sector: '금융' },
+  '105560': { name: 'KB금융', sector: '금융' },
+  '055550': { name: '신한지주', sector: '금융' },
+  '316140': { name: '우리금융지주', sector: '금융' },
+  '024110': { name: '기업은행', sector: '금융' },
+  '138930': { name: 'BNK금융지주', sector: '금융' },
+  // Korean stocks - 추가
+  '051910': { name: 'LG화학', sector: '화학' },
+  '000270': { name: '기아', sector: '자동차' },
+  '017670': { name: 'SK텔레콤', sector: '통신' },
+  '068270': { name: '셀트리온', sector: '바이오' },
+  '003550': { name: 'LG', sector: '지주' },
+  '028260': { name: '삼성물산', sector: '건설/지주' },
+  '012330': { name: '현대모비스', sector: '자동차부품' },
+  '066570': { name: 'LG전자', sector: '전자' },
+  '034730': { name: 'SK', sector: '지주' },
+  '096770': { name: 'SK이노베이션', sector: '에너지/화학' },
+  '003670': { name: '포스코홀딩스', sector: '철강/지주' },
+  '015760': { name: '한국전력', sector: '전력' },
+  '033780': { name: 'KT&G', sector: '담배/식품' },
+  '030200': { name: 'KT', sector: '통신' },
+  '032830': { name: '삼성생명', sector: '보험' },
+  '009150': { name: '삼성전기', sector: '전자부품' },
+  '010130': { name: '고려아연', sector: '비철금속' },
+  '018260': { name: '삼성에스디에스', sector: 'IT서비스' },
   // US stocks
   'AAPL': { name: 'Apple', sector: 'Technology' },
   'MSFT': { name: 'Microsoft', sector: 'Technology' },
