@@ -48,7 +48,7 @@ const US_ANALYSIS_STOCKS = [
 // OpenRouter 최신 모델 (2024년 12월)
 const OPENROUTER_MODELS: Record<string, string> = {
   claude: 'anthropic/claude-opus-4.5',           // Claude Opus 4.5 (최신)
-  gemini: 'google/gemini-2.5-flash',             // Gemini 2.5 Flash (안정적)
+  gemini: 'google/gemini-3-flash-preview',       // Gemini 3 Flash (최신)
   gpt: 'openai/gpt-5.2',                         // GPT-5.2 (최신)
 };
 
@@ -198,12 +198,38 @@ Respond with JSON only, no other text.`;
 
     const data = await response.json();
     const text = data.choices?.[0]?.message?.content || '';
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-
+    
+    // JSON 추출 및 정제
+    let jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      const result = JSON.parse(jsonMatch[0]).top5;
-      console.log(`[OpenRouter US] Successfully parsed ${result.length} stocks for ${heroId}`);
-      return result;
+      let jsonStr = jsonMatch[0];
+      
+      // JSON 정제 - 일반적인 오류 수정
+      jsonStr = jsonStr
+        .replace(/,\s*}/g, '}')           // 트레일링 콤마 제거
+        .replace(/,\s*]/g, ']')           // 배열 트레일링 콤마 제거
+        .replace(/[\u0000-\u001F]+/g, '') // 제어 문자 제거
+        .replace(/\n\s*\n/g, '\n');       // 중복 줄바꿈 제거
+      
+      try {
+        const parsed = JSON.parse(jsonStr);
+        const result = parsed.top5 || [];
+        console.log(`[OpenRouter US] Successfully parsed ${result.length} stocks for ${heroId}`);
+        return result;
+      } catch (parseError) {
+        console.error('[OpenRouter US] JSON parse error, trying to fix:', parseError);
+        
+        // 추가 정제 시도
+        jsonStr = jsonStr.replace(/(["\d])\s*\n\s*(["\d{[])/g, '$1,$2');
+        try {
+          const parsed = JSON.parse(jsonStr);
+          const result = parsed.top5 || [];
+          console.log(`[OpenRouter US] Recovered ${result.length} stocks for ${heroId}`);
+          return result;
+        } catch {
+          console.error('[OpenRouter US] Failed to recover JSON');
+        }
+      }
     }
   } catch (error) {
     console.error('[OpenRouter US] Analysis error:', error);

@@ -37,7 +37,7 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '');
 // OpenRouter 최신 모델 (2024년 12월)
 const OPENROUTER_MODELS: Record<string, string> = {
   claude: 'anthropic/claude-opus-4.5',           // Claude Opus 4.5 (최신)
-  gemini: 'google/gemini-2.5-flash',             // Gemini 2.5 Flash (안정적)
+  gemini: 'google/gemini-3-flash-preview',       // Gemini 3 Flash (최신)
   gpt: 'openai/gpt-5.2',                         // GPT-5.2 (최신)
 };
 
