@@ -15,7 +15,9 @@ interface StockRecommendation {
   score: number;
   reason: string;
   risks: string[];
-  sector: string;
+  highlights?: string[];
+  sector?: string;
+  dividend?: number;
 }
 
 interface HeroInfo {
@@ -36,6 +38,24 @@ interface HeroRecommendation {
   error: string | null;
 }
 
+interface SectorInfo {
+  id: string;
+  name: string;
+  nameKo: string;
+  icon: string;
+  description: string;
+}
+
+interface SectorRecommendation {
+  sector: SectorInfo;
+  sectorAnalysis: string;
+  stocks: StockRecommendation[];
+  date: string;
+  time: string;
+  isLoading: boolean;
+  error: string | null;
+}
+
 const HEROES = [
   { id: 'claude', color: 'from-amber-500 to-orange-600', icon: '🔍', textColor: 'text-amber-400', name: '클로드 리' },
   { id: 'gemini', color: 'from-cyan-500 to-blue-600', icon: '🚀', textColor: 'text-cyan-400', name: '제미 나인' },
@@ -43,24 +63,25 @@ const HEROES = [
 ];
 
 const SECTORS = [
-  { id: 'all', name: '전체', icon: '🌐' },
-  { id: 'Technology', name: '테크', icon: '💻' },
-  { id: 'Semiconductor', name: '반도체', icon: '🔬' },
-  { id: 'Finance', name: '금융', icon: '🏦' },
-  { id: 'Healthcare', name: '헬스케어', icon: '🏥' },
-  { id: 'Consumer', name: '소비재', icon: '🛒' },
-  { id: 'Energy', name: '에너지', icon: '⚡' },
+  { id: 'Technology', name: '테크', icon: '💻', color: 'from-blue-500 to-cyan-500' },
+  { id: 'Semiconductor', name: '반도체', icon: '🔬', color: 'from-purple-500 to-pink-500' },
+  { id: 'Finance', name: '금융', icon: '🏦', color: 'from-green-500 to-emerald-500' },
+  { id: 'Healthcare', name: '헬스케어', icon: '🏥', color: 'from-rose-500 to-red-500' },
+  { id: 'Consumer', name: '소비재', icon: '🛒', color: 'from-orange-500 to-yellow-500' },
+  { id: 'Energy', name: '에너지', icon: '⚡', color: 'from-amber-500 to-orange-500' },
 ];
 
 type ViewMode = 'consensus' | 'individual' | 'sector';
 
 export default function USStocksPage() {
   const [recommendations, setRecommendations] = useState<Record<string, HeroRecommendation>>({});
+  const [sectorRecommendations, setSectorRecommendations] = useState<Record<string, SectorRecommendation>>({});
   const [selectedHero, setSelectedHero] = useState<string>('claude');
-  const [selectedSector, setSelectedSector] = useState<string>('all');
+  const [selectedSector, setSelectedSector] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('consensus');
   const [expandedStock, setExpandedStock] = useState<string | null>(null);
   const fetchedRef = useRef<Set<string>>(new Set());
+  const sectorFetchedRef = useRef<Set<string>>(new Set());
   const initialLoadRef = useRef(false);
 
   const fetchHeroRecommendations = useCallback(async (heroId: string) => {
@@ -111,6 +132,56 @@ export default function USStocksPage() {
     }
   }, []);
 
+  const fetchSectorRecommendations = useCallback(async (sectorId: string) => {
+    if (sectorFetchedRef.current.has(sectorId)) return;
+    sectorFetchedRef.current.add(sectorId);
+    
+    setSectorRecommendations(prev => ({
+      ...prev,
+      [sectorId]: {
+        sector: prev[sectorId]?.sector || {} as SectorInfo,
+        sectorAnalysis: prev[sectorId]?.sectorAnalysis || '',
+        stocks: prev[sectorId]?.stocks || [],
+        date: prev[sectorId]?.date || '',
+        time: prev[sectorId]?.time || '',
+        isLoading: true,
+        error: null,
+      },
+    }));
+
+    try {
+      const response = await fetch(`/api/us-stocks/sector/${sectorId}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch sector recommendations');
+      }
+
+      setSectorRecommendations(prev => ({
+        ...prev,
+        [sectorId]: {
+          sector: data.sector,
+          sectorAnalysis: data.sectorAnalysis,
+          stocks: data.stocks,
+          date: data.date,
+          time: data.time,
+          isLoading: false,
+          error: null,
+        },
+      }));
+    } catch (error) {
+      sectorFetchedRef.current.delete(sectorId);
+      setSectorRecommendations(prev => ({
+        ...prev,
+        [sectorId]: {
+          ...prev[sectorId],
+          isLoading: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      }));
+    }
+  }, []);
+
   // 초기 로드 시 모든 AI 데이터 가져오기
   useEffect(() => {
     if (!initialLoadRef.current) {
@@ -121,8 +192,17 @@ export default function USStocksPage() {
     }
   }, [fetchHeroRecommendations]);
 
+  // 섹터 선택 시 데이터 로드
+  useEffect(() => {
+    if (viewMode === 'sector' && selectedSector) {
+      fetchSectorRecommendations(selectedSector);
+    }
+  }, [viewMode, selectedSector, fetchSectorRecommendations]);
+
   const currentData = recommendations[selectedHero];
   const heroConfig = HEROES.find(h => h.id === selectedHero);
+  const currentSectorData = selectedSector ? sectorRecommendations[selectedSector] : null;
+  const currentSectorConfig = SECTORS.find(s => s.id === selectedSector);
   
   // 로딩 상태 확인
   const isAnyLoading = HEROES.some(h => recommendations[h.id]?.isLoading);
@@ -130,7 +210,6 @@ export default function USStocksPage() {
 
   // 합의 종목 계산
   const getConsensusStocks = () => {
-    const allStocks = Object.values(recommendations).flatMap(r => r.stocks || []);
     const stockMap = new Map<string, { count: number; stocks: StockRecommendation[]; heroes: string[] }>();
     
     Object.entries(recommendations).forEach(([heroId, data]) => {
@@ -168,36 +247,7 @@ export default function USStocksPage() {
     return { unanimous, majority };
   };
 
-  // 섹터별 종목 계산
-  const getSectorStocks = () => {
-    const allStocks = Object.values(recommendations).flatMap(r => r.stocks || []);
-    const sectorMap = new Map<string, StockRecommendation[]>();
-    
-    allStocks.forEach(stock => {
-      const sector = stock.sector || 'Other';
-      const existing = sectorMap.get(sector) || [];
-      // 중복 제거
-      if (!existing.find(s => s.symbol === stock.symbol)) {
-        existing.push(stock);
-      }
-      sectorMap.set(sector, existing);
-    });
-
-    return sectorMap;
-  };
-
   const { unanimous, majority } = getConsensusStocks();
-  const sectorStocks = getSectorStocks();
-
-  // 필터링된 종목
-  const getFilteredStocks = () => {
-    if (selectedSector === 'all') {
-      return currentData?.stocks || [];
-    }
-    return (currentData?.stocks || []).filter(s => 
-      s.sector?.toLowerCase().includes(selectedSector.toLowerCase())
-    );
-  };
 
   return (
     <>
@@ -245,18 +295,21 @@ export default function USStocksPage() {
                 👤 개별 AI 추천
               </button>
               <button
-                onClick={() => setViewMode('sector')}
+                onClick={() => {
+                  setViewMode('sector');
+                  if (!selectedSector) setSelectedSector('Technology');
+                }}
                 className={`px-5 py-2.5 rounded-lg font-medium transition-all ${
                   viewMode === 'sector'
                     ? 'bg-brand-500 text-white'
                     : 'bg-dark-800 text-dark-400 hover:bg-dark-700'
                 }`}
               >
-                📊 섹터별 보기
+                📊 섹터별 AI 추천
               </button>
             </div>
 
-            {/* Hero/Sector Selector based on view mode */}
+            {/* Hero Selector for Individual View */}
             {viewMode === 'individual' && (
               <div className="flex justify-center gap-3 flex-wrap">
                 {HEROES.map(hero => (
@@ -276,19 +329,20 @@ export default function USStocksPage() {
               </div>
             )}
 
+            {/* Sector Selector for Sector View */}
             {viewMode === 'sector' && (
               <div className="flex justify-center gap-2 flex-wrap">
                 {SECTORS.map(sector => (
                   <button
                     key={sector.id}
                     onClick={() => setSelectedSector(sector.id)}
-                    className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                    className={`px-4 py-2.5 rounded-xl font-medium transition-all duration-300 ${
                       selectedSector === sector.id
-                        ? 'bg-brand-500 text-white'
+                        ? `bg-gradient-to-r ${sector.color} text-white shadow-lg scale-105`
                         : 'bg-dark-800 text-dark-400 hover:bg-dark-700'
                     }`}
                   >
-                    <span className="mr-1">{sector.icon}</span>
+                    <span className="mr-2">{sector.icon}</span>
                     {sector.name}
                   </button>
                 ))}
@@ -499,62 +553,96 @@ export default function USStocksPage() {
           )}
 
           {/* Sector View */}
-          {viewMode === 'sector' && (
+          {viewMode === 'sector' && selectedSector && (
             <div className="space-y-8">
-              {selectedSector === 'all' ? (
-                // 전체 섹터 보기
-                Array.from(sectorStocks.entries()).map(([sector, stocks]) => (
-                  <section key={sector}>
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="text-xl">
-                        {SECTORS.find(s => s.id === sector || s.name === sector)?.icon || '📁'}
-                      </span>
-                      <h3 className="text-lg font-bold text-dark-100">{sector}</h3>
-                      <span className="text-dark-500 text-sm">({stocks.length}종목)</span>
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                      {stocks.slice(0, 6).map(stock => (
-                        <div key={stock.symbol} className="card p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <div>
-                              <h4 className="font-semibold text-dark-100">{stock.name}</h4>
-                              <span className="text-dark-500 text-sm">{stock.symbol}</span>
-                            </div>
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                              stock.score >= 4.5 ? 'bg-emerald-500/20 text-emerald-400' :
-                              stock.score >= 4.0 ? 'bg-brand-500/20 text-brand-400' :
-                              'bg-dark-700 text-dark-400'
-                            }`}>
-                              {stock.score.toFixed(1)}
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-dark-200 font-medium">${stock.currentPrice.toFixed(2)}</span>
-                            <span className="text-brand-400">→ ${stock.targetPrice.toFixed(2)}</span>
-                          </div>
+              {/* Sector Header */}
+              {currentSectorData?.sector?.nameKo && (
+                <div className={`card p-6 border-l-4 bg-gradient-to-r from-dark-800/50 to-transparent`}
+                  style={{ borderLeftColor: currentSectorConfig?.color.includes('blue') ? '#3b82f6' : 
+                    currentSectorConfig?.color.includes('purple') ? '#a855f7' :
+                    currentSectorConfig?.color.includes('green') ? '#22c55e' :
+                    currentSectorConfig?.color.includes('rose') ? '#f43f5e' :
+                    currentSectorConfig?.color.includes('orange') ? '#f97316' :
+                    currentSectorConfig?.color.includes('amber') ? '#f59e0b' : '#6366f1'
+                  }}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="text-4xl">{currentSectorConfig?.icon}</div>
+                    <div className="flex-1">
+                      <h2 className="text-2xl font-bold text-dark-100">
+                        {currentSectorData.sector.nameKo} 섹터 AI 분석
+                      </h2>
+                      <p className="text-dark-400 mt-1">{currentSectorData.sector.description}</p>
+                      {currentSectorData.sectorAnalysis && (
+                        <div className="mt-4 p-4 bg-dark-800/50 rounded-lg">
+                          <p className="text-dark-300 leading-relaxed">
+                            💡 {currentSectorData.sectorAnalysis}
+                          </p>
                         </div>
-                      ))}
+                      )}
                     </div>
-                  </section>
-                ))
-              ) : (
-                // 특정 섹터 보기
-                <div className="grid gap-4 md:grid-cols-2">
-                  {(sectorStocks.get(selectedSector) || []).map(stock => (
-                    <StockCard
+                    <div className="text-right text-sm text-dark-500">
+                      <p>{currentSectorData.date}</p>
+                      <p>{currentSectorData.time} 기준</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Loading State */}
+              {currentSectorData?.isLoading && (
+                <div className="text-center py-16">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-dark-800 mb-4">
+                    <svg className="animate-spin h-8 w-8 text-brand-500" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  </div>
+                  <p className="text-dark-400 text-lg">
+                    {currentSectorConfig?.icon} {currentSectorConfig?.name} 섹터 AI 분석 중...
+                  </p>
+                  <p className="text-dark-500 text-sm mt-2">섹터 전문 AI가 종목을 분석하고 있습니다</p>
+                </div>
+              )}
+
+              {/* Error State */}
+              {currentSectorData?.error && (
+                <div className="text-center py-16">
+                  <div className="text-5xl mb-4">⚠️</div>
+                  <p className="text-rose-400 text-lg mb-4">{currentSectorData.error}</p>
+                  <button
+                    onClick={() => {
+                      sectorFetchedRef.current.delete(selectedSector);
+                      fetchSectorRecommendations(selectedSector);
+                    }}
+                    className="btn-primary"
+                  >
+                    다시 시도
+                  </button>
+                </div>
+              )}
+
+              {/* Sector Stocks */}
+              {currentSectorData?.stocks && currentSectorData.stocks.length > 0 && (
+                <div className="space-y-4">
+                  {currentSectorData.stocks.map((stock, index) => (
+                    <SectorStockCard
                       key={stock.symbol}
                       stock={stock}
-                      index={0}
-                      heroConfig={heroConfig}
+                      index={index}
+                      sectorConfig={currentSectorConfig}
                       expanded={expandedStock === stock.symbol}
                       onToggle={() => setExpandedStock(expandedStock === stock.symbol ? null : stock.symbol)}
                     />
                   ))}
-                  {(sectorStocks.get(selectedSector) || []).length === 0 && (
-                    <div className="col-span-2 card p-8 text-center">
-                      <p className="text-dark-400">해당 섹터의 추천 종목이 없습니다</p>
-                    </div>
-                  )}
+                </div>
+              )}
+
+              {/* No data yet */}
+              {!currentSectorData?.isLoading && !currentSectorData?.stocks?.length && !currentSectorData?.error && (
+                <div className="card p-8 text-center">
+                  <div className="text-4xl mb-4">{currentSectorConfig?.icon}</div>
+                  <p className="text-dark-400">섹터를 선택하면 AI가 분석을 시작합니다</p>
                 </div>
               )}
             </div>
@@ -597,9 +685,11 @@ function StockCard({
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-lg font-semibold text-dark-100">{stock.name}</h3>
               <span className="text-sm text-dark-500">{stock.symbol}</span>
-              <span className="px-2 py-0.5 bg-dark-700 rounded text-xs text-dark-400">
-                {stock.sector}
-              </span>
+              {stock.sector && (
+                <span className="px-2 py-0.5 bg-dark-700 rounded text-xs text-dark-400">
+                  {stock.sector}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-4 mt-1">
               <span className="text-xl font-bold text-dark-200">
@@ -656,6 +746,135 @@ function StockCard({
             <p className="text-dark-300 leading-relaxed">{stock.reason}</p>
           </div>
 
+          {stock.risks && stock.risks.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-rose-400 mb-2">⚠️ 리스크 요인</h4>
+              <ul className="space-y-1">
+                {stock.risks.map((risk, i) => (
+                  <li key={i} className="text-dark-400 text-sm flex items-start gap-2">
+                    <span className="text-dark-600">•</span>
+                    {risk}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SectorStockCard({ 
+  stock, 
+  index, 
+  sectorConfig, 
+  expanded, 
+  onToggle 
+}: { 
+  stock: StockRecommendation; 
+  index: number;
+  sectorConfig?: typeof SECTORS[0];
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="card overflow-hidden transition-all duration-300 hover:border-dark-600">
+      <div className="p-4 sm:p-6 cursor-pointer" onClick={onToggle}>
+        <div className="flex items-center gap-4">
+          {/* Rank */}
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${
+            index === 0 ? 'bg-yellow-500/20 text-yellow-400' :
+            index === 1 ? 'bg-gray-400/20 text-gray-300' :
+            index === 2 ? 'bg-amber-700/20 text-amber-600' :
+            'bg-dark-700 text-dark-400'
+          }`}>
+            {stock.rank || index + 1}
+          </div>
+
+          {/* Stock Info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-lg font-semibold text-dark-100">{stock.name}</h3>
+              <span className="text-sm text-dark-500">{stock.symbol}</span>
+              {stock.dividend && stock.dividend > 0 && (
+                <span className="px-2 py-0.5 bg-emerald-500/20 rounded text-xs text-emerald-400">
+                  배당 {stock.dividend}%
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-4 mt-1">
+              <span className="text-xl font-bold text-dark-200">
+                ${stock.currentPrice.toFixed(2)}
+              </span>
+              <span className={`text-sm font-medium ${
+                stock.changePercent >= 0 ? 'text-emerald-400' : 'text-rose-400'
+              }`}>
+                {stock.changePercent >= 0 ? '▲' : '▼'} {Math.abs(stock.changePercent).toFixed(2)}%
+              </span>
+            </div>
+          </div>
+
+          {/* Target & Score */}
+          <div className="text-right hidden sm:block">
+            <div className="text-sm text-dark-500">목표가</div>
+            <div className="text-lg font-bold text-brand-400">
+              ${stock.targetPrice.toFixed(2)}
+            </div>
+            <div className="text-sm text-emerald-400">
+              +{stock.expectedReturn}
+            </div>
+          </div>
+
+          {/* Score Badge */}
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${
+            stock.score >= 4.5 ? 'bg-emerald-500/20 text-emerald-400' :
+            stock.score >= 4.0 ? 'bg-brand-500/20 text-brand-400' :
+            stock.score >= 3.5 ? 'bg-amber-500/20 text-amber-400' :
+            'bg-dark-700 text-dark-400'
+          }`}>
+            {stock.score.toFixed(1)}
+          </div>
+
+          {/* Expand Icon */}
+          <svg
+            className={`w-5 h-5 text-dark-500 transition-transform ${expanded ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </div>
+
+      {/* Expanded Content */}
+      {expanded && (
+        <div className="px-4 sm:px-6 pb-6 border-t border-dark-700 pt-4 space-y-4">
+          {/* AI Analysis */}
+          <div>
+            <h4 className="text-sm font-semibold text-brand-400 mb-2">
+              {sectorConfig?.icon} 섹터 전문 AI 분석
+            </h4>
+            <p className="text-dark-300 leading-relaxed">{stock.reason}</p>
+          </div>
+
+          {/* Highlights */}
+          {stock.highlights && stock.highlights.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-emerald-400 mb-2">✨ 투자 포인트</h4>
+              <ul className="space-y-1">
+                {stock.highlights.map((highlight, i) => (
+                  <li key={i} className="text-dark-300 text-sm flex items-start gap-2">
+                    <span className="text-emerald-400">✓</span>
+                    {highlight}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Risks */}
           {stock.risks && stock.risks.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold text-rose-400 mb-2">⚠️ 리스크 요인</h4>
