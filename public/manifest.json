@@ -1,0 +1,25 @@
+{
+  "name": "StockHero - AI Stock Analysis",
+  "short_name": "StockHero",
+  "description": "Watch Claude, Gemini, and GPT debate stocks in real-time",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-icon",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["finance", "business", "news"],
+  "lang": "ko-KR"
+}
+
