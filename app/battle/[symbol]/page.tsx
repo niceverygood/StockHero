@@ -79,6 +79,7 @@ interface TargetInfo {
 }
 
 const SYMBOL_MAP: Record<string, { name: string; sector: string; price: number }> = {
+  // Korean stocks
   '005930': { name: '삼성전자', sector: 'Semiconductor', price: 71500 },
   '000660': { name: 'SK하이닉스', sector: 'Semiconductor', price: 178000 },
   '373220': { name: 'LG에너지솔루션', sector: 'Battery', price: 385000 },
@@ -92,6 +93,19 @@ const SYMBOL_MAP: Record<string, { name: string; sector: string; price: number }
   '105560': { name: 'KB금융', sector: 'Finance', price: 78500 },
   '017670': { name: 'SK텔레콤', sector: 'Telecom', price: 53200 },
   '068270': { name: '셀트리온', sector: 'Bio', price: 178500 },
+  // US stocks
+  'AAPL': { name: 'Apple', sector: 'Technology', price: 250 },
+  'MSFT': { name: 'Microsoft', sector: 'Technology', price: 430 },
+  'GOOGL': { name: 'Alphabet', sector: 'Technology', price: 195 },
+  'AMZN': { name: 'Amazon', sector: 'Technology', price: 225 },
+  'META': { name: 'Meta', sector: 'Technology', price: 620 },
+  'NVDA': { name: 'NVIDIA', sector: 'Semiconductor', price: 140 },
+  'TSLA': { name: 'Tesla', sector: 'EV/Auto', price: 440 },
+  'TSM': { name: 'TSMC', sector: 'Semiconductor', price: 200 },
+  'JPM': { name: 'JPMorgan Chase', sector: 'Finance', price: 240 },
+  'V': { name: 'Visa', sector: 'Finance', price: 310 },
+  'UNH': { name: 'UnitedHealth', sector: 'Healthcare', price: 520 },
+  'AMD': { name: 'AMD', sector: 'Semiconductor', price: 125 },
 };
 
 interface RealTimeStockInfo {
@@ -540,7 +554,13 @@ export default function BattlePage() {
   useEffect(() => {
     async function fetchRealTimePrice() {
       try {
-        const res = await fetch(`/api/stock/price?symbol=${symbol}`);
+        // 미국 주식인지 확인 (영문 알파벳으로만 구성된 경우)
+        const isUSStock = /^[A-Za-z]+$/.test(symbol);
+        const apiUrl = isUSStock 
+          ? `/api/stock/us?symbol=${symbol}`
+          : `/api/stock/price?symbol=${symbol}`;
+        
+        const res = await fetch(apiUrl);
         const data = await res.json();
         
         if (data.success && data.data) {
@@ -550,11 +570,11 @@ export default function BattlePage() {
           
           setRealTimeInfo({
             name: isValidName ? apiName : baseSymbolInfo.name,
-            sector: baseSymbolInfo.sector,
+            sector: baseSymbolInfo.sector || data.data.sector || 'Unknown',
             price: data.data.price,
             change: data.data.change || 0,
             changePercent: data.data.changePercent || 0,
-            isRealTime: data.source === 'kis',
+            isRealTime: data.source === 'kis' || data.source === 'yahoo',
           });
         }
       } catch (error) {

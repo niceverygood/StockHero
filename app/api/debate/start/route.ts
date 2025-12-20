@@ -3,6 +3,7 @@ import { createDebateSession, getSymbolByCode } from '@/lib/supabase';
 
 // Fallback symbol lookup
 const MOCK_SYMBOLS: Record<string, { name: string; sector: string }> = {
+  // Korean stocks
   '005930': { name: '삼성전자', sector: '반도체' },
   '000660': { name: 'SK하이닉스', sector: '반도체' },
   '373220': { name: 'LG에너지솔루션', sector: '2차전지' },
@@ -11,6 +12,27 @@ const MOCK_SYMBOLS: Record<string, { name: string; sector: string }> = {
   '006400': { name: '삼성SDI', sector: '2차전지' },
   '035720': { name: '카카오', sector: 'IT서비스' },
   '035420': { name: 'NAVER', sector: 'IT서비스' },
+  // US stocks
+  'AAPL': { name: 'Apple', sector: 'Technology' },
+  'MSFT': { name: 'Microsoft', sector: 'Technology' },
+  'GOOGL': { name: 'Alphabet', sector: 'Technology' },
+  'AMZN': { name: 'Amazon', sector: 'Consumer Discretionary' },
+  'META': { name: 'Meta', sector: 'Technology' },
+  'NVDA': { name: 'NVIDIA', sector: 'Semiconductor' },
+  'TSLA': { name: 'Tesla', sector: 'Electric Vehicles' },
+  'JPM': { name: 'JPMorgan Chase', sector: 'Finance' },
+  'TSM': { name: 'TSMC', sector: 'Semiconductor' },
+  'V': { name: 'Visa', sector: 'Finance' },
+  'UNH': { name: 'UnitedHealth', sector: 'Healthcare' },
+  'JNJ': { name: 'Johnson & Johnson', sector: 'Healthcare' },
+  'WMT': { name: 'Walmart', sector: 'Consumer Staples' },
+  'MA': { name: 'Mastercard', sector: 'Finance' },
+  'PG': { name: 'Procter & Gamble', sector: 'Consumer Staples' },
+  'HD': { name: 'Home Depot', sector: 'Consumer Discretionary' },
+  'COST': { name: 'Costco', sector: 'Consumer Staples' },
+  'ABBV': { name: 'AbbVie', sector: 'Healthcare' },
+  'CRM': { name: 'Salesforce', sector: 'Technology' },
+  'AMD': { name: 'AMD', sector: 'Semiconductor' },
 };
 
 export async function POST(request: NextRequest) {

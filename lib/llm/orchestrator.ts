@@ -3,6 +3,7 @@ import { MockLLMAdapter } from './mock';
 import { ClaudeAdapter } from './claude';
 import { GeminiAdapter } from './gemini';
 import { GPTAdapter } from './gpt';
+import { OpenRouterAdapter } from './openrouter';
 import { deriveConsensus, type ConsensusResult } from './analysis-framework';
 
 interface DebateMessage {
@@ -19,11 +20,18 @@ interface DebateMessage {
 }
 
 function getAdapter(character: CharacterType): LLMAdapter {
-  // Check if real API keys are available
+  // Check if API keys are available
+  const hasOpenRouter = !!process.env.OPENROUTER_API_KEY;
   const hasOpenAI = !!process.env.OPENAI_API_KEY;
   const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
   const hasGoogle = !!process.env.GOOGLE_AI_API_KEY;
 
+  // Prefer OpenRouter if available (supports all models)
+  if (hasOpenRouter) {
+    return new OpenRouterAdapter(character);
+  }
+
+  // Fallback to individual API keys
   switch (character) {
     case 'claude':
       return hasAnthropic ? new ClaudeAdapter() : new MockLLMAdapter('claude');
