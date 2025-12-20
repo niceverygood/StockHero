@@ -408,13 +408,16 @@ export default function USStocksPage() {
                             <span className="text-dark-500 text-xs">평균 점수</span>
                             <span className="text-yellow-400 font-bold">{item.avgScore.toFixed(1)}</span>
                           </div>
-                          <div className="flex -space-x-1">
+                          <div className="flex items-center gap-1">
                             {HEROES.map(h => (
-                              <div key={h.id} className={`w-6 h-6 rounded-full bg-gradient-to-r ${h.color} flex items-center justify-center text-xs border-2 border-dark-900`}>
+                              <div key={h.id} className={`w-7 h-7 rounded-full bg-gradient-to-r ${h.color} flex items-center justify-center text-sm border-2 border-dark-900`} title={h.name}>
                                 {h.icon}
                               </div>
                             ))}
                           </div>
+                        </div>
+                        <div className="mt-2 text-xs text-dark-500 text-center">
+                          3명 모두 추천 ({HEROES.map(h => h.name).join(', ')})
                         </div>
                       </div>
                     ))}
@@ -458,16 +461,19 @@ export default function USStocksPage() {
                               </span>
                             </div>
                           </div>
-                          <div className="flex -space-x-1">
+                          <div className="flex items-center gap-1">
                             {item.heroes.map(heroId => {
                               const h = HEROES.find(x => x.id === heroId);
                               return h ? (
-                                <div key={heroId} className={`w-6 h-6 rounded-full bg-gradient-to-r ${h.color} flex items-center justify-center text-xs border-2 border-dark-900`}>
+                                <div key={heroId} className={`w-7 h-7 rounded-full bg-gradient-to-r ${h.color} flex items-center justify-center text-sm border-2 border-dark-900`} title={h.name}>
                                   {h.icon}
                                 </div>
                               ) : null;
                             })}
                           </div>
+                        </div>
+                        <div className="text-xs text-dark-500 mb-2">
+                          {item.heroes.map(heroId => HEROES.find(x => x.id === heroId)?.name).filter(Boolean).join(' + ')} 추천
                         </div>
                         
                         <div className="flex items-center justify-between">
@@ -739,10 +745,14 @@ function StockCard({
       {/* Expanded Content */}
       {expanded && (
         <div className="px-4 sm:px-6 pb-6 border-t border-dark-700 pt-4">
+          {/* AI Profile Badge */}
+          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r ${heroConfig?.color || 'from-brand-500 to-brand-600'} mb-4`}>
+            <span className="text-lg">{heroConfig?.icon || '🤖'}</span>
+            <span className="text-white font-medium">{heroConfig?.name || 'AI'}</span>
+            <span className="text-white/70 text-sm">의 분석</span>
+          </div>
+          
           <div className="mb-4">
-            <h4 className={`text-sm font-semibold ${heroConfig?.textColor || 'text-brand-400'} mb-2`}>
-              {heroConfig?.icon || '🤖'} AI 분석 의견
-            </h4>
             <p className="text-dark-300 leading-relaxed">{stock.reason}</p>
           </div>
 
@@ -851,11 +861,15 @@ function SectorStockCard({
       {/* Expanded Content */}
       {expanded && (
         <div className="px-4 sm:px-6 pb-6 border-t border-dark-700 pt-4 space-y-4">
+          {/* AI Profile Badge */}
+          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r ${sectorConfig?.color || 'from-brand-500 to-brand-600'}`}>
+            <span className="text-lg">{sectorConfig?.icon || '📊'}</span>
+            <span className="text-white font-medium">{sectorConfig?.name || '섹터'} 전문 AI</span>
+            <span className="text-white/70 text-sm">의 분석</span>
+          </div>
+          
           {/* AI Analysis */}
           <div>
-            <h4 className="text-sm font-semibold text-brand-400 mb-2">
-              {sectorConfig?.icon} 섹터 전문 AI 분석
-            </h4>
             <p className="text-dark-300 leading-relaxed">{stock.reason}</p>
           </div>
 
