@@ -5,14 +5,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { UserMenu } from './UserMenu';
 
-const NAV_LINKS = [
+const NAV_LINKS: { href: string; label: string; highlight?: boolean }[] = [
   { href: '/verdict', label: 'Top 5' },
   { href: '/heroes', label: 'Stock Heros' },
   { href: '/us-stocks', label: '🇺🇸 US Stocks' },
   { href: '/themes', label: '🔥 Hot Themes' },
   { href: '/battle/005930', label: 'Watch Debate' },
   { href: '/consulting', label: 'Consulting' },
-  { href: '/archive', label: 'Archive' },
+  { href: '/subscription', label: '💎 구독', highlight: true },
 ];
 
 export function Header() {
@@ -43,7 +43,9 @@ export function Header() {
                   key={link.href}
                   href={link.href}
                   className={`px-3 lg:px-4 py-2 text-sm rounded-lg transition-all ${
-                    isActive(link.href)
+                    link.highlight
+                      ? 'bg-gradient-to-r from-brand-500 to-purple-500 text-white font-medium hover:opacity-90'
+                      : isActive(link.href)
                       ? 'text-brand-400 bg-brand-500/10'
                       : 'text-dark-400 hover:text-dark-100 hover:bg-dark-800/50'
                   }`}
@@ -87,7 +89,9 @@ export function Header() {
                     href={link.href}
                     onClick={() => setIsMobileMenuOpen(false)}
                     className={`px-3 py-2.5 text-sm rounded-lg transition-all ${
-                      isActive(link.href)
+                      link.highlight
+                        ? 'bg-gradient-to-r from-brand-500 to-purple-500 text-white font-medium'
+                        : isActive(link.href)
                         ? 'text-brand-400 bg-brand-500/10'
                         : 'text-dark-300 hover:text-dark-100 hover:bg-dark-800/50'
                     }`}

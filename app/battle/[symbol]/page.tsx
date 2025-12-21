@@ -305,6 +305,45 @@ function TypingIndicator() {
   );
 }
 
+function GeneratingIndicator({ character }: { character: CharacterType }) {
+  const char = CHARACTERS[character];
+  
+  return (
+    <div className="flex items-start gap-4 animate-fade-in">
+      {/* Avatar */}
+      <div className="relative">
+        <CharacterAvatar character={character} size="lg" />
+        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-dark-800 rounded-full flex items-center justify-center border-2 border-dark-900">
+          <div className="w-2 h-2 bg-brand-500 rounded-full animate-pulse" />
+        </div>
+      </div>
+      
+      {/* Generating bubble */}
+      <div className={`p-4 rounded-2xl rounded-tl-sm ${char.bgColor} border border-current/10 max-w-xs`}>
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className={`w-2 h-2 rounded-full animate-bounce ${char.bgColor.replace('/10', '/50').replace('bg-', 'bg-')}`}
+                style={{ 
+                  animationDelay: `${i * 0.15}s`,
+                  backgroundColor: char.color.includes('cyan') ? '#06b6d4' 
+                    : char.color.includes('emerald') ? '#10b981' 
+                    : '#f59e0b'
+                }}
+              />
+            ))}
+          </div>
+          <span className={`text-sm ${char.color}`}>
+            {char.name}이(가) 분석 중...
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TargetSummaryCard({ targets, currentPrice }: { targets: TargetInfo[]; currentPrice: number }) {
   if (targets.length === 0) return null;
   
@@ -532,6 +571,7 @@ export default function BattlePage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [round, setRound] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [generatingCharacter, setGeneratingCharacter] = useState<CharacterType | null>(null); // 현재 생성 중인 캐릭터
   const [isComplete, setIsComplete] = useState(false);
   const [selectedCharacter, setSelectedCharacter] = useState<CharacterInfo | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -702,9 +742,11 @@ export default function BattlePage() {
     
     generatingRoundRef.current = r;
     setIsLoading(true);
+    setGeneratingCharacter('claude'); // 첫 번째로 Claude 시작
     
     try {
-      const res = await fetch('/api/debate/next', {
+      // SSE 스트리밍 사용
+      const response = await fetch('/api/debate/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -715,59 +757,99 @@ export default function BattlePage() {
           currentPrice: symbolInfo.price,
         }),
       });
-      const data = await res.json();
-      if (data.success) {
-        const newMessages = data.data.messages.map((m: {
-          character: CharacterType;
-          content: string;
-          score: number;
-          risks: string[];
-          sources: string[];
-          targetPrice?: number;
-          targetDate?: string;
-          priceRationale?: string;
-          dateRationale?: string;
-          methodology?: string;
-        }, i: number) => ({
-          id: `${sid}-${r}-${m.character}-${i}`, // 더 고유한 ID 생성
-          character: m.character,
-          round: r,
-          content: m.content,
-          score: m.score,
-          risks: m.risks,
-          sources: m.sources,
-          targetPrice: m.targetPrice,
-          targetDate: m.targetDate,
-          priceRationale: m.priceRationale,
-          dateRationale: m.dateRationale,
-          methodology: m.methodology,
-          timestamp: new Date().toISOString(),
-        }));
-        
-        // 중복 메시지 필터링
-        setMessages((prev) => {
-          const existingIds = new Set(prev.map(m => m.id));
-          const uniqueNewMessages = newMessages.filter((m: Message) => !existingIds.has(m.id));
-          return [...prev, ...uniqueNewMessages];
-        });
-        setRound(r);
-        
-        // Update targets
-        if (data.data.targets) {
-          setTargets(data.data.targets);
-        }
-        
-        // Record debate view in history
-        recordDebateView(symbol, symbolInfo.name, sid, r, 4);
-        
-        if (r >= 4) {
-          setIsComplete(true);
+
+      if (!response.ok) {
+        throw new Error('Stream request failed');
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No reader available');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      const characterOrder: CharacterType[] = ['claude', 'gemini', 'gpt'];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const event = JSON.parse(line.slice(6));
+              
+              if (event.type === 'message') {
+                // 새 메시지 도착 - 즉시 표시
+                const m = event.data;
+                const newMessage: Message = {
+                  id: m.id || `${sid}-${r}-${m.character}-${event.index}`,
+                  character: m.character,
+                  round: r,
+                  content: m.content,
+                  score: m.score,
+                  risks: m.risks,
+                  sources: m.sources,
+                  targetPrice: m.targetPrice,
+                  targetDate: m.targetDate,
+                  priceRationale: m.priceRationale,
+                  dateRationale: m.dateRationale,
+                  methodology: m.methodology,
+                  timestamp: m.createdAt || new Date().toISOString(),
+                };
+
+                // 중복 체크 후 추가
+                setMessages((prev) => {
+                  const existingIds = new Set(prev.map(msg => msg.id));
+                  if (existingIds.has(newMessage.id)) return prev;
+                  return [...prev, newMessage];
+                });
+
+                // 첫 번째 메시지(Claude) 도착 시 로딩 해제
+                if (event.index === 0) {
+                  setIsLoading(false);
+                }
+
+                // 다음 캐릭터 생성 중 표시 (마지막이 아니면)
+                const nextIndex = event.index + 1;
+                if (nextIndex < characterOrder.length) {
+                  setGeneratingCharacter(characterOrder[nextIndex]);
+                } else {
+                  setGeneratingCharacter(null);
+                }
+              } else if (event.type === 'complete') {
+                // 라운드 완료
+                setRound(r);
+                setGeneratingCharacter(null);
+                
+                if (event.data.targets) {
+                  setTargets(event.data.targets);
+                }
+                
+                recordDebateView(symbol, symbolInfo.name, sid, r, 4);
+                
+                if (event.data.isComplete) {
+                  setIsComplete(true);
+                }
+              } else if (event.type === 'error') {
+                console.error(`Error for ${event.character}:`, event.error);
+              }
+            } catch (e) {
+              console.error('Failed to parse SSE event:', e);
+            }
+          }
         }
       }
     } catch (error) {
       console.error('Failed to generate round:', error);
     } finally {
       setIsLoading(false);
+      setGeneratingCharacter(null);
       generatingRoundRef.current = null;
     }
   }
@@ -1000,6 +1082,11 @@ export default function BattlePage() {
                   );
                 })}
 
+                {/* 캐릭터 생성 중 표시 */}
+                {generatingCharacter && !isLoading && (
+                  <GeneratingIndicator character={generatingCharacter} />
+                )}
+                
                 {/* 로딩 중이거나 대기 중인 메시지가 있을 때 표시 */}
                 {(isLoading || (pendingMessages.length > 0 && currentAnimatingId === null)) && <TypingIndicator />}
                 
@@ -1036,25 +1123,57 @@ export default function BattlePage() {
                     const latestTarget = charMsgs.filter(m => m.targetPrice).slice(-1)[0];
                     // 토론 완료 후에만 목표가 표시
                     const showTargetPrice = isComplete && currentAnimatingId === null && pendingMessages.length === 0;
+                    // 현재 생성 중인 캐릭터인지 확인
+                    const isGenerating = generatingCharacter === charId;
                     return (
                       <button
                         key={charId}
                         onClick={() => handleCharacterClick(char)}
-                        className="w-full flex items-center gap-3 p-3 rounded-xl bg-dark-800/50 hover:bg-dark-800 transition-all group cursor-pointer"
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all group cursor-pointer ${
+                          isGenerating 
+                            ? `${char.bgColor} border border-current/20` 
+                            : 'bg-dark-800/50 hover:bg-dark-800'
+                        }`}
                       >
-                        <CharacterAvatar character={charId} size="md" />
+                        <div className="relative">
+                          <CharacterAvatar character={charId} size="md" />
+                          {isGenerating && (
+                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-brand-500 rounded-full animate-pulse" />
+                          )}
+                        </div>
                         <div className="flex-1 min-w-0 text-left">
                           <div className="text-sm font-medium text-dark-200 group-hover:text-dark-100 truncate transition-colors">
                             {char.name}
                           </div>
-                          <div className="text-xs text-dark-500">{char.role}</div>
+                          <div className="text-xs text-dark-500">
+                            {isGenerating ? '분석 중...' : char.role}
+                          </div>
                         </div>
                         <div className="text-right">
-                          <div className={`text-sm font-semibold ${char.color}`}>{avgScore}</div>
-                          {showTargetPrice && latestTarget?.targetPrice && (
-                            <div className="text-xs text-dark-500">
-                              {latestTarget.targetPrice.toLocaleString()}원
+                          {isGenerating ? (
+                            <div className="flex gap-1">
+                              {[0, 1, 2].map((i) => (
+                                <div
+                                  key={i}
+                                  className={`w-1.5 h-1.5 rounded-full animate-bounce`}
+                                  style={{ 
+                                    animationDelay: `${i * 0.15}s`,
+                                    backgroundColor: char.color.includes('cyan') ? '#06b6d4' 
+                                      : char.color.includes('emerald') ? '#10b981' 
+                                      : '#f59e0b'
+                                  }}
+                                />
+                              ))}
                             </div>
+                          ) : (
+                            <>
+                              <div className={`text-sm font-semibold ${char.color}`}>{avgScore}</div>
+                              {showTargetPrice && latestTarget?.targetPrice && (
+                                <div className="text-xs text-dark-500">
+                                  {latestTarget.targetPrice.toLocaleString()}원
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                       </button>

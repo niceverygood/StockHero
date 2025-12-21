@@ -53,6 +53,124 @@ export class DebateOrchestrator {
     this.currentPrice = price;
   }
 
+  /**
+   * 단일 캐릭터의 응답만 생성 (스트리밍용)
+   */
+  async generateSingleCharacter(
+    symbol: string,
+    symbolName: string,
+    round: number,
+    character: CharacterType
+  ): Promise<DebateMessage> {
+    const adapter = getAdapter(character);
+    const context: LLMContext = {
+      symbol,
+      symbolName,
+      round,
+      currentPrice: this.currentPrice,
+      previousMessages: this.previousMessages.map(m => ({
+        character: m.character,
+        content: m.content,
+        targetPrice: m.targetPrice,
+        targetDate: m.targetDate,
+      })),
+      previousTargets: this.previousTargets,
+    };
+
+    try {
+      const response = await adapter.generateStructured(context);
+      
+      // 목표가 검증
+      let validatedTargetPrice = response.targetPrice;
+      if (validatedTargetPrice !== undefined) {
+        if (validatedTargetPrice < this.currentPrice * 0.5) {
+          console.warn(`[Orchestrator] ${character} target price ${validatedTargetPrice} is unrealistic, recalculating`);
+          const fallbackMultiplier = character === 'gemini' ? 1.3 : character === 'claude' ? 1.15 : 1.1;
+          validatedTargetPrice = Math.round(this.currentPrice * fallbackMultiplier / 100) * 100;
+        } else if (validatedTargetPrice > this.currentPrice * 5) {
+          console.warn(`[Orchestrator] ${character} target price ${validatedTargetPrice} is too high, capping`);
+          const capMultiplier = character === 'gemini' ? 2.0 : 1.5;
+          validatedTargetPrice = Math.round(this.currentPrice * capMultiplier / 100) * 100;
+        }
+      }
+      
+      const message: DebateMessage = {
+        character,
+        content: response.content,
+        score: response.score,
+        risks: response.risks,
+        sources: response.sources,
+        targetPrice: validatedTargetPrice,
+        targetDate: response.targetDate,
+        priceRationale: response.priceRationale,
+        dateRationale: response.dateRationale,
+        methodology: response.methodology,
+      };
+      
+      // 메시지 저장 (이전 메시지에 추가)
+      this.previousMessages.push(message);
+      
+      // 목표가 업데이트
+      if (validatedTargetPrice && response.targetDate) {
+        const existingIndex = this.previousTargets.findIndex(t => t.character === character);
+        const newTarget = {
+          character,
+          targetPrice: validatedTargetPrice,
+          targetDate: response.targetDate,
+        };
+        if (existingIndex >= 0) {
+          this.previousTargets[existingIndex] = newTarget;
+        } else {
+          this.previousTargets.push(newTarget);
+        }
+      }
+      
+      return message;
+    } catch (error) {
+      console.error(`Error generating response for ${character}:`, error);
+      // Fallback to mock
+      const mockAdapter = new MockLLMAdapter(character);
+      const response = await mockAdapter.generateStructured(context);
+      
+      let validatedTargetPrice = response.targetPrice;
+      if (validatedTargetPrice !== undefined && validatedTargetPrice < this.currentPrice * 0.5) {
+        const fallbackMultiplier = character === 'gemini' ? 1.3 : character === 'claude' ? 1.15 : 1.1;
+        validatedTargetPrice = Math.round(this.currentPrice * fallbackMultiplier / 100) * 100;
+      }
+      
+      const message: DebateMessage = {
+        character,
+        content: response.content,
+        score: response.score,
+        risks: response.risks,
+        sources: response.sources,
+        targetPrice: validatedTargetPrice,
+        targetDate: response.targetDate,
+        priceRationale: response.priceRationale,
+        dateRationale: response.dateRationale,
+        methodology: response.methodology,
+      };
+      
+      this.previousMessages.push(message);
+      
+      if (validatedTargetPrice && response.targetDate) {
+        const existingIndex = this.previousTargets.findIndex(t => t.character === character);
+        const newTarget = {
+          character,
+          targetPrice: validatedTargetPrice,
+          targetDate: response.targetDate,
+        };
+        if (existingIndex >= 0) {
+          this.previousTargets[existingIndex] = newTarget;
+        } else {
+          this.previousTargets.push(newTarget);
+        }
+      }
+      
+      return message;
+    }
+  }
+
   async generateRound(
     symbol: string,
     symbolName: string,
