@@ -272,3 +272,5 @@ export const getThemeStocksByMarket = (themeId: string, market: 'KR' | 'US') => 
   return theme.stocks.filter(stock => stock.market === market);
 };
 
+
+

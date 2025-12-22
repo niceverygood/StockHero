@@ -12,6 +12,7 @@ const NAV_LINKS: { href: string; label: string; highlight?: boolean }[] = [
   { href: '/themes', label: '🔥 Hot Themes' },
   { href: '/battle/005930', label: 'Watch Debate' },
   { href: '/consulting', label: 'Consulting' },
+  { href: '/investment-style', label: '🧬 투자성향' },
   { href: '/subscription', label: '💎 구독', highlight: true },
 ];
 
