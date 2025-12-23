@@ -49,9 +49,9 @@ async function fetchUSStockPrices(symbols: string[]): Promise<Map<string, any>> 
   
   try {
     const results = await fetchMultipleYahooUSStocks(symbols);
-    results.forEach((result, index) => {
+    results.forEach((result, symbol) => {
       if (result) {
-        priceMap.set(symbols[index], {
+        priceMap.set(symbol, {
           price: result.price,
           changePercent: result.changePercent,
           volume: result.volume,
@@ -251,7 +251,9 @@ export async function GET(
   ]);
 
   // 가격 맵 병합
-  const allPrices = new Map([...krPrices, ...usPrices]);
+  const allPrices = new Map<string, any>();
+  krPrices.forEach((value, key) => allPrices.set(key, value));
+  usPrices.forEach((value, key) => allPrices.set(key, value));
 
   // AI 분석 수행
   const analysis = await analyzeThemeWithAI(theme, heroId, allPrices);

@@ -136,11 +136,11 @@ async function analyzeSectorWithAI(
   sector: string,
   stocks: Array<{ symbol: string; name: string; marketCap: string; per: number; growth: number; dividend?: number }>,
   realPrices: Map<string, any>
-): Promise<any[]> {
+): Promise<{ sectorAnalysis: string; top5: any[] }> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     console.error('[Sector AI] No API key configured');
-    return [];
+    return { sectorAnalysis: '', top5: [] };
   }
 
   const sectorInfo = SECTOR_INFO[sector];
@@ -211,7 +211,7 @@ ${stockList}
     if (!response.ok) {
       const error = await response.text();
       console.error(`[Sector AI] API error: ${response.status}`, error);
-      return [];
+      return { sectorAnalysis: '', top5: [] };
     }
 
     const data = await response.json();

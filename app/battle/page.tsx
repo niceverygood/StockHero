@@ -32,8 +32,8 @@ export default function BattleLandingPage() {
   const [isStockSearchOpen, setIsStockSearchOpen] = useState(false);
   const [selectedTab, setSelectedTab] = useState<'kr' | 'us'>('kr');
 
-  const handleStockSelect = (symbol: string) => {
-    router.push(`/battle/${symbol}`);
+  const handleStockSelect = (stock: { symbol: string; name: string; sector: string }) => {
+    router.push(`/battle/${stock.symbol}`);
   };
 
   const popularStocks = selectedTab === 'kr' ? POPULAR_STOCKS : POPULAR_US_STOCKS;
@@ -111,7 +111,7 @@ export default function BattleLandingPage() {
                 {popularStocks.map((stock) => (
                   <button
                     key={stock.symbol}
-                    onClick={() => handleStockSelect(stock.symbol)}
+                    onClick={() => handleStockSelect(stock)}
                     className="p-4 bg-dark-800 hover:bg-dark-700 border border-dark-700 hover:border-brand-500/50 rounded-xl transition-all text-left group"
                   >
                     <div className="font-semibold text-white group-hover:text-brand-400 transition-colors">
@@ -169,16 +169,16 @@ export default function BattleLandingPage() {
                 return (
                   <div
                     key={charId}
-                    className={`card ${char.bgColor} border-${char.borderColor}`}
+                    className={`card ${char.bgColor}`}
                   >
                     <div className="flex items-center gap-3 mb-3">
                       <CharacterAvatar character={charId} size="md" />
                       <div>
                         <div className={`font-semibold ${char.color}`}>{char.name}</div>
-                        <div className="text-xs text-dark-500">{char.title}</div>
+                        <div className="text-xs text-dark-500">{char.roleKo}</div>
                       </div>
                     </div>
-                    <p className="text-sm text-dark-400 italic">"{char.tagline}"</p>
+                    <p className="text-sm text-dark-400 italic">&ldquo;{char.catchphrase}&rdquo;</p>
                   </div>
                 );
               })}

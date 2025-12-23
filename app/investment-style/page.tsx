@@ -338,7 +338,7 @@ export default function InvestmentStylePage() {
                   className="card p-6 mb-6"
                 >
                   <h2 className="text-xl font-bold text-dark-100 mb-3">
-                    "{result.title}"
+                    &ldquo;{result.title}&rdquo;
                   </h2>
                   <p className="text-dark-300 leading-relaxed">
                     {result.description}

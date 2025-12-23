@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { DisclaimerBar, Header, CharacterAvatar, AIConsultationModal, MultiExpertConsultation, StockSearchModal, AIPortfolioSimulator, useToast } from '@/components';
 import { CHARACTERS } from '@/lib/characters';
@@ -19,7 +19,7 @@ interface StockInfo {
   isRealTime: boolean;
 }
 
-export default function ConsultingPage() {
+function ConsultingPageContent() {
   const searchParams = useSearchParams();
   const [selectedStock, setSelectedStock] = useState<StockInfo | null>(null);
   const [consultCharacter, setConsultCharacter] = useState<CharacterType | null>(null);
@@ -461,3 +461,26 @@ export default function ConsultingPage() {
   );
 }
 
+function LoadingFallback() {
+  return (
+    <>
+      <DisclaimerBar />
+      <Header />
+      <main className="min-h-screen bg-dark-950 pt-28 pb-16">
+        <div className="container-app">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500" />
+          </div>
+        </div>
+      </main>
+    </>
+  );
+}
+
+export default function ConsultingPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <ConsultingPageContent />
+    </Suspense>
+  );
+}
