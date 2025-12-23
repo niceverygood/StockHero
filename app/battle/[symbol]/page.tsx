@@ -79,7 +79,7 @@ interface TargetInfo {
 }
 
 const SYMBOL_MAP: Record<string, { name: string; sector: string; price: number }> = {
-  // Korean stocks
+  // Korean stocks - Tech & Semiconductor
   '005930': { name: '삼성전자', sector: 'Semiconductor', price: 71500 },
   '000660': { name: 'SK하이닉스', sector: 'Semiconductor', price: 178000 },
   '373220': { name: 'LG에너지솔루션', sector: 'Battery', price: 385000 },
@@ -90,9 +90,28 @@ const SYMBOL_MAP: Record<string, { name: string; sector: string; price: number }
   '035420': { name: 'NAVER', sector: 'IT Service', price: 192000 },
   '051910': { name: 'LG화학', sector: 'Chemical', price: 298000 },
   '000270': { name: '기아', sector: 'Auto', price: 94800 },
-  '105560': { name: 'KB금융', sector: 'Finance', price: 78500 },
   '017670': { name: 'SK텔레콤', sector: 'Telecom', price: 53200 },
   '068270': { name: '셀트리온', sector: 'Bio', price: 178500 },
+  '009150': { name: '삼성전기', sector: 'Electronic Parts', price: 145000 },
+  '066570': { name: 'LG전자', sector: 'Electronics', price: 95000 },
+  '012330': { name: '현대모비스', sector: 'Auto Parts', price: 230000 },
+  '018260': { name: '삼성에스디에스', sector: 'IT Service', price: 145000 },
+  '028260': { name: '삼성물산', sector: 'Construction', price: 115000 },
+  '003670': { name: '포스코홀딩스', sector: 'Steel', price: 298000 },
+  '034730': { name: 'SK', sector: 'Holding', price: 155000 },
+  '003550': { name: 'LG', sector: 'Holding', price: 72000 },
+  '247540': { name: '에코프로비엠', sector: 'Battery', price: 185000 },
+  '012450': { name: '한화에어로스페이스', sector: 'Defense', price: 380000 },
+  '443060': { name: '레인보우로보틱스', sector: 'Robotics', price: 165000 },
+  // Korean stocks - Finance
+  '086790': { name: '하나금융지주', sector: 'Finance', price: 94100 },
+  '105560': { name: 'KB금융', sector: 'Finance', price: 82400 },
+  '055550': { name: '신한지주', sector: 'Finance', price: 51200 },
+  '316140': { name: '우리금융지주', sector: 'Finance', price: 14500 },
+  '024110': { name: '기업은행', sector: 'Finance', price: 13800 },
+  '138930': { name: 'BNK금융지주', sector: 'Finance', price: 8500 },
+  '032830': { name: '삼성생명', sector: 'Insurance', price: 95000 },
+  '000810': { name: '삼성화재', sector: 'Insurance', price: 350000 },
   // US stocks
   'AAPL': { name: 'Apple', sector: 'Technology', price: 250 },
   'MSFT': { name: 'Microsoft', sector: 'Technology', price: 430 },
