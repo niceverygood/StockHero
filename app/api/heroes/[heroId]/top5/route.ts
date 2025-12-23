@@ -521,10 +521,44 @@ export async function GET(
   console.log(`[${heroId}] AI analysis successful, got ${top5.length} stocks`);
   
   // 4. 실시간 가격 병합 + 목표가 검증
+  // 기본 가격 (실시간 가격 조회 실패 시 사용)
+  const FALLBACK_PRICES: Record<string, number> = {
+    '005930': 55000,   // 삼성전자
+    '000660': 178000,  // SK하이닉스
+    '005380': 210000,  // 현대차
+    '035420': 190000,  // NAVER
+    '105560': 82000,   // KB금융
+    '247540': 95000,   // 에코프로비엠
+    '086520': 75000,   // 에코프로
+    '377300': 23000,   // 카카오페이
+    '352820': 210000,  // 하이브
+    '196170': 445000,  // 알테오젠
+    '443060': 165000,  // 레인보우로보틱스
+    '099320': 8500,    // 쏠리드
+    '419120': 42000,   // LS에코에너지
+    '012450': 888000,  // 한화에어로스페이스
+    '047810': 62000,   // 한국항공우주
+    '042700': 128000,  // 한미반도체
+    '395400': 12500,   // 맥쿼리인프라
+    '161390': 38000,   // 한국타이어앤테크놀로지
+    '058470': 215000,  // 리노공업
+    '145020': 190000,  // 휴젤
+    '039030': 180000,  // 이오테크닉스
+    '017670': 53000,   // SK텔레콤
+    '055550': 52000,   // 신한지주
+    '032830': 82000,   // 삼성생명
+  };
+  
   const stocksWithPrices = top5.map((stock, idx) => {
     const realPrice = realPrices.get(stock.symbol);
-    const currentPrice = realPrice?.price || 0;
+    // 실시간 가격 우선, 없으면 폴백 가격 사용
+    const currentPrice = realPrice?.price || FALLBACK_PRICES[stock.symbol] || 0;
     const stockInfo = ANALYSIS_STOCKS.find(s => s.symbol === stock.symbol);
+    
+    // 가격 조회 실패 로그
+    if (!realPrice?.price && FALLBACK_PRICES[stock.symbol]) {
+      console.warn(`[${stock.symbol}] Using fallback price: ${FALLBACK_PRICES[stock.symbol]}`);
+    }
     
     // 목표가 검증 로직
     let multiplier = stock.targetPriceMultiplier || 1.2;

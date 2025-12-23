@@ -410,7 +410,7 @@ export default function HeroDetailPage() {
                       </p>
                     ) : (
                       <p className="text-sm text-yellow-400/80 animate-pulse">
-                        🔒 5번 의견보기 후 공개
+                        🔒 5번 의견보기 후 목표가 공개
                       </p>
                     )}
                   </div>
