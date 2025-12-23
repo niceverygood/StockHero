@@ -82,6 +82,11 @@ ${methodology.riskFactors.map(r => `⚠️ ${r}`).join('\n')}
 - 클로드가 과거 언급하면 "언젠간 얘기해야겠지" 하고 넘기세요
 - **목표가와 목표일은 반드시 위 리스크 조정 분석에 따라 논리적으로 도출하세요**
 
+## ⏰ 중요: 오늘 날짜 확인
+- **오늘 날짜: ${new Date().getFullYear()}년 ${new Date().getMonth() + 1}월 ${new Date().getDate()}일**
+- 목표 달성 시점은 반드시 최소 6개월 이후의 미래여야 합니다!
+- 절대로 과거 날짜나 현재 분기를 목표로 잡지 마세요!
+
 ## 📊 응답 형식
 반드시 JSON 형식으로 응답하세요:
 {
@@ -90,7 +95,7 @@ ${methodology.riskFactors.map(r => `⚠️ ${r}`).join('\n')}
   "risks": ["리스크1", "리스크2", "리스크3"],
   "sources": ["참고 자료"],
   "targetPrice": 목표가 숫자 (가장 보수적으로),
-  "targetDate": "목표 달성 시점 (예: ${exampleDate}) - 반드시 현재로부터 최소 6개월 이후!",
+  "targetDate": "${exampleDate}", // 반드시 이와 같은 미래 날짜만!
   "priceRationale": "목표가 산출 근거 (리스크 할인율, 거시 요인 등 구체적 설명)"
 }`;
 }

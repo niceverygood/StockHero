@@ -288,6 +288,7 @@ export function getMinimumFutureDate(monthsAhead: number = 6): string {
 
 /**
  * 캐릭터별 적절한 미래 날짜 예시 생성
+ * 검증 로직보다 약간 더 먼 미래를 반환해서 안전마진 확보
  */
 export function getExampleFutureDateForCharacter(character: CharacterType): string {
   const now = new Date();
@@ -295,82 +296,153 @@ export function getExampleFutureDateForCharacter(character: CharacterType): stri
   
   switch (character) {
     case 'claude':
-      // 6-9개월 후 분기 (보수적)
+      // 7-9개월 후 분기 (보수적) - 검증(5개월)보다 2개월 여유
       const claudeFuture = new Date(now);
-      claudeFuture.setMonth(claudeFuture.getMonth() + 6);
+      claudeFuture.setMonth(claudeFuture.getMonth() + 7);
       const claudeQuarter = Math.ceil((claudeFuture.getMonth() + 1) / 3);
       return `${claudeFuture.getFullYear()}년 ${claudeQuarter}분기`;
       
     case 'gemini':
-      // 12-24개월 후 (공격적)
+      // 14-24개월 후 (공격적) - 검증(10개월)보다 4개월 여유
       const geminiFuture = new Date(now);
-      geminiFuture.setMonth(geminiFuture.getMonth() + 12);
+      geminiFuture.setMonth(geminiFuture.getMonth() + 14);
       const geminiHalf = geminiFuture.getMonth() < 6 ? '상반기' : '하반기';
       return `${geminiFuture.getFullYear()}년 ${geminiHalf}`;
       
     case 'gpt':
-      // 6-12개월 후 구체적 날짜 (균형)
+      // 7-12개월 후 구체적 날짜 (균형) - 검증(5개월)보다 2개월 여유
       const gptFuture = new Date(now);
-      gptFuture.setMonth(gptFuture.getMonth() + 6);
+      gptFuture.setMonth(gptFuture.getMonth() + 7);
       return `${gptFuture.getFullYear()}-${String(gptFuture.getMonth() + 1).padStart(2, '0')}-30`;
   }
 }
 
 /**
  * 목표 날짜가 현실적인 미래인지 검증하고, 아니면 보정
+ * 
+ * 중요: AI가 반환한 날짜가 과거이거나 너무 가까운 미래면 무조건 보정
  */
 export function validateAndCorrectTargetDate(targetDate: string | undefined, character: CharacterType): string {
   const now = new Date();
-  const minMonths = character === 'gemini' ? 12 : 6; // 제미나인은 최소 12개월, 나머지는 6개월
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  
+  // 캐릭터별 최소 미래 개월 수 (약간 여유를 둠)
+  const minMonths = character === 'gemini' ? 10 : 5; // 12→10, 6→5로 여유
   const minFutureDate = new Date(now);
   minFutureDate.setMonth(minFutureDate.getMonth() + minMonths);
   
-  if (!targetDate) {
+  // 목표 날짜가 없으면 기본값 반환
+  if (!targetDate || targetDate.trim() === '') {
+    console.log(`[${character}] No target date provided, using default`);
     return getExampleFutureDateForCharacter(character);
   }
   
   // 날짜 파싱 시도
   const parsed = parseKoreanDate(targetDate);
-  if (!parsed || parsed <= minFutureDate) {
-    // 너무 가까운 미래이거나 과거이면 보정
+  
+  // 파싱 실패 시 기본값 반환
+  if (!parsed) {
+    console.log(`[${character}] Failed to parse target date: "${targetDate}", using default`);
     return getExampleFutureDateForCharacter(character);
   }
   
+  // 과거이거나 현재보다 이전인 경우 기본값 반환
+  if (parsed <= now) {
+    console.log(`[${character}] Target date "${targetDate}" is in the past, using default`);
+    return getExampleFutureDateForCharacter(character);
+  }
+  
+  // 최소 미래 날짜보다 이전인 경우 기본값 반환
+  if (parsed < minFutureDate) {
+    console.log(`[${character}] Target date "${targetDate}" is too soon (min: ${minMonths} months), using default`);
+    return getExampleFutureDateForCharacter(character);
+  }
+  
+  // 검증 통과
   return targetDate;
 }
 
 /**
  * 한글 날짜 문자열 파싱 (예: "2026년 2분기", "2027년 상반기", "2026-06-30")
+ * 다양한 형식을 지원하고, 년도만 있는 경우도 처리
  */
 function parseKoreanDate(dateStr: string): Date | null {
+  if (!dateStr) return null;
+  
   try {
+    const cleanStr = dateStr.trim();
+    
     // YYYY-MM-DD 형식
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-      return new Date(dateStr);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(cleanStr)) {
+      const date = new Date(cleanStr);
+      return isNaN(date.getTime()) ? null : date;
+    }
+    
+    // YYYY/MM/DD 형식
+    if (/^\d{4}\/\d{2}\/\d{2}$/.test(cleanStr)) {
+      const date = new Date(cleanStr.replace(/\//g, '-'));
+      return isNaN(date.getTime()) ? null : date;
     }
     
     // YYYY년 N분기 형식
-    const quarterMatch = dateStr.match(/(\d{4})년\s*(\d)분기/);
+    const quarterMatch = cleanStr.match(/(\d{4})년?\s*(\d)\s*분기/);
     if (quarterMatch) {
       const year = parseInt(quarterMatch[1]);
       const quarter = parseInt(quarterMatch[2]);
-      return new Date(year, quarter * 3 - 1, 1); // 분기 마지막 달의 1일
+      if (quarter >= 1 && quarter <= 4) {
+        return new Date(year, quarter * 3 - 1, 15); // 분기 마지막 달의 15일
+      }
     }
     
     // YYYY년 상/하반기 형식
-    const halfMatch = dateStr.match(/(\d{4})년\s*(상반기|하반기)/);
+    const halfMatch = cleanStr.match(/(\d{4})년?\s*(상반기|하반기)/);
     if (halfMatch) {
       const year = parseInt(halfMatch[1]);
       const month = halfMatch[2] === '상반기' ? 6 : 12;
-      return new Date(year, month - 1, 1);
+      return new Date(year, month - 1, 15);
     }
     
-    // YYYY년 N월 형식
-    const monthMatch = dateStr.match(/(\d{4})년\s*(\d+)월/);
+    // YYYY년 N월 형식 (예: 2026년 6월, 2026년 12월)
+    const monthMatch = cleanStr.match(/(\d{4})년?\s*(\d{1,2})월/);
     if (monthMatch) {
       const year = parseInt(monthMatch[1]);
       const month = parseInt(monthMatch[2]);
-      return new Date(year, month - 1, 1);
+      if (month >= 1 && month <= 12) {
+        return new Date(year, month - 1, 15);
+      }
+    }
+    
+    // H1/H2 YYYY 형식 (예: H2 2026)
+    const h1h2Match = cleanStr.match(/H([12])\s*(\d{4})/i);
+    if (h1h2Match) {
+      const half = parseInt(h1h2Match[1]);
+      const year = parseInt(h1h2Match[2]);
+      return new Date(year, half === 1 ? 5 : 11, 15);
+    }
+    
+    // Q1-Q4 YYYY 형식 (예: Q2 2026)
+    const qMatch = cleanStr.match(/Q([1-4])\s*(\d{4})/i);
+    if (qMatch) {
+      const quarter = parseInt(qMatch[1]);
+      const year = parseInt(qMatch[2]);
+      return new Date(year, quarter * 3 - 1, 15);
+    }
+    
+    // 년도만 있는 경우 (예: 2026년, 2026)
+    const yearOnlyMatch = cleanStr.match(/^(\d{4})년?$/);
+    if (yearOnlyMatch) {
+      const year = parseInt(yearOnlyMatch[1]);
+      return new Date(year, 5, 15); // 해당 년도 6월 중순
+    }
+    
+    // 숫자 4자리가 포함된 경우 년도로 추정
+    const anyYearMatch = cleanStr.match(/(\d{4})/);
+    if (anyYearMatch) {
+      const year = parseInt(anyYearMatch[1]);
+      if (year >= 2024 && year <= 2030) {
+        return new Date(year, 5, 15); // 해당 년도 6월 중순
+      }
     }
     
     return null;

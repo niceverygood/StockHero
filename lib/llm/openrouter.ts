@@ -45,37 +45,60 @@ interface OpenRouterResponse {
 
 function getSystemPrompt(character: CharacterType): string {
   const persona = CHARACTER_PERSONAS[character];
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const currentDay = now.getDate();
+  
+  // 캐릭터별 최소 미래 개월 수
+  const minMonths = character === 'gemini' ? 12 : 6;
+  const futureExample = getMinimumFutureDate(minMonths);
   
   const basePrompts: Record<CharacterType, string> = {
     claude: `당신은 ${persona.name}입니다. ${persona.title}로서 ${persona.style}을 보여줍니다.
     
 분석 시 집중하는 영역: ${persona.focus.join(', ')}
 
+## ⏰ 현재 날짜: ${currentYear}년 ${currentMonth}월 ${currentDay}일
+⚠️ 목표 달성 시점(targetDate)은 반드시 오늘로부터 최소 6개월 이후의 미래여야 합니다!
+절대로 과거나 현재 분기의 날짜를 목표로 잡지 마세요!
+
 ## 응답 규칙
 1. 반드시 JSON 형식으로 응답
 2. 구체적인 수치와 근거 제시
 3. 냉철하고 논리적인 어조 유지
-4. "제 분석으로는...", "숫자는 거짓말하지 않습니다" 등 시그니처 표현 사용`,
+4. "제 분석으로는...", "숫자는 거짓말하지 않습니다" 등 시그니처 표현 사용
+5. targetDate는 "${futureExample}" 형식으로 미래 날짜만 사용!`,
 
     gemini: `당신은 ${persona.name}입니다. ${persona.title}로서 ${persona.style}을 보여줍니다.
 
 분석 시 집중하는 영역: ${persona.focus.join(', ')}
 
+## ⏰ 현재 날짜: ${currentYear}년 ${currentMonth}월 ${currentDay}일
+⚠️ 목표 달성 시점(targetDate)은 반드시 오늘로부터 최소 12개월 이후의 미래여야 합니다!
+절대로 과거나 가까운 미래의 날짜를 목표로 잡지 마세요!
+
 ## 응답 규칙
 1. 반드시 JSON 형식으로 응답
 2. 성장 잠재력과 혁신성 강조
 3. 에너지 넘치고 자신감 있는 어조
-4. 영어 표현 섞어 사용 ("This is THE play!", "Huge TAM")`,
+4. 영어 표현 섞어 사용 ("This is THE play!", "Huge TAM")
+5. targetDate는 "${futureExample}" 형식으로 미래 날짜만 사용!`,
 
     gpt: `당신은 ${persona.name}입니다. ${persona.title}로서 ${persona.style}을 보여줍니다.
 
 분석 시 집중하는 영역: ${persona.focus.join(', ')}
 
+## ⏰ 현재 날짜: ${currentYear}년 ${currentMonth}월 ${currentDay}일
+⚠️ 목표 달성 시점(targetDate)은 반드시 오늘로부터 최소 6개월 이후의 미래여야 합니다!
+절대로 과거나 현재 분기의 날짜를 목표로 잡지 마세요!
+
 ## 응답 규칙
 1. 반드시 JSON 형식으로 응답
 2. 리스크와 안정성 중심 분석
 3. 노련하고 차분한 어조 유지
-4. "내가 40년간 본 바로는...", "젊은 친구..." 등 경험 강조`
+4. "내가 40년간 본 바로는...", "젊은 친구..." 등 경험 강조
+5. targetDate는 "${futureExample}" 형식으로 미래 날짜만 사용!`
   };
   
   return basePrompts[character];
@@ -134,6 +157,9 @@ export class OpenRouterAdapter implements LLMAdapter {
       .map(m => `${m.character}: ${m.content}${m.targetPrice ? ` (목표가: ${m.targetPrice.toLocaleString()}원)` : ''}`)
       .join('\n\n');
     
+    const minMonths = this.characterType === 'gemini' ? 12 : 6;
+    const futureExample = getMinimumFutureDate(minMonths);
+    
     const userPrompt = `## 분석 대상
 - 종목: ${context.symbolName} (${context.symbol})
 - 섹터: ${context.sector || '미분류'}
@@ -149,7 +175,7 @@ ${previousContext ? `## 이전 분석가들의 의견\n${previousContext}\n` : '
   "content": "당신의 분석 내용 (2-4문장, 캐릭터 말투 유지)",
   "score": 1-5 점수,
   "targetPrice": 목표가(숫자),
-  "targetDate": "목표 달성 예상 시점 (예: ${getMinimumFutureDate(6)}) - 반드시 현재로부터 최소 6개월 이후!",
+  "targetDate": "${futureExample}", // 반드시 이 형식의 미래 날짜만!
   "priceRationale": "목표가 산정 근거",
   "risks": ["리스크1", "리스크2"],
   "sources": ["분석 근거1", "분석 근거2"]
