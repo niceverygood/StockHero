@@ -231,7 +231,7 @@ export function MissedProfitCalculator() {
             </svg>
           </div>
           <div>
-            <h3 className="text-xl font-bold text-white">이번 주 놓친 수익</h3>
+            <h3 className="text-xl font-bold text-white">이번 달 놓친 수익</h3>
             <p className="text-sm text-red-300/80">AI 추천을 따랐다면...</p>
           </div>
         </div>
