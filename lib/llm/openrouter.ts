@@ -8,11 +8,11 @@ import type { LLMAdapter, LLMContext, LLMResponse, CharacterType } from './types
 import { CHARACTER_PERSONAS } from './types';
 import { getMinimumFutureDate, validateAndCorrectTargetDate } from './analysis-framework';
 
-// OpenRouter 최신 모델 (2024년 12월)
+// OpenRouter 최신 모델 (2024년 12월) - 사용자 요청에 따른 설정
 const MODEL_MAP: Record<CharacterType, string> = {
-  claude: 'anthropic/claude-opus-4.5',           // Claude Opus 4.5 (최신)
-  gemini: 'google/gemini-3-flash-preview',       // Gemini 3 Flash (최신)
-  gpt: 'openai/gpt-5.2',                         // GPT-5.2 (최신)
+  claude: 'anthropic/claude-sonnet-4',           // Claude Sonnet 4 (Opus 4.5 대체)
+  gemini: 'google/gemini-2.5-pro-preview-06-05', // Gemini 2.5 Pro (Gemini 3 대체)
+  gpt: 'openai/o1',                              // OpenAI o1 (GPT 5.2 대체)
 };
 
 // 대체 모델 (rate limit이나 에러 시)

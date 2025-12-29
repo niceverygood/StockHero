@@ -67,3 +67,4 @@ export interface StyleRecommendation {
   heroId: 'claude' | 'gemini' | 'gpt';
 }
 
+

@@ -175,3 +175,4 @@ export function generateMockPredictions(days: number): PredictionRecord[] {
 
 
 
+

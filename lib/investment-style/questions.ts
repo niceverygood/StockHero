@@ -321,3 +321,4 @@ export function calculateInvestorType(answers: { dimension: string; value: strin
   return `${dimensions.risk}${dimensions.style}${dimensions.activity}${dimensions.horizon}`;
 }
 
+

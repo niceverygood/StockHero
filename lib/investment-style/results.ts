@@ -302,3 +302,4 @@ export const TYPE_PREFERENCES: Record<InvestorType, {
   SVPT: { riskWeight: 0.15, growthWeight: 0.2, valueWeight: 0.85, dividendWeight: 0.8, volatilityPreference: 'low' },
 };
 
+
