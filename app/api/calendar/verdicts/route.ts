@@ -8,32 +8,74 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// 종목명 매핑 (실시간 가격 조회용)
+// 종목명 매핑 (실시간 가격 조회용) - 확장된 종목 목록
 const STOCK_NAMES: Record<string, { name: string; sector: string }> = {
+  // 반도체/전자
   '005930': { name: '삼성전자', sector: '반도체' },
   '000660': { name: 'SK하이닉스', sector: '반도체' },
-  '005380': { name: '현대차', sector: '자동차' },
-  '035420': { name: 'NAVER', sector: 'IT서비스' },
-  '105560': { name: 'KB금융', sector: '금융' },
-  '017670': { name: 'SK텔레콤', sector: '통신' },
-  '247540': { name: '에코프로비엠', sector: '2차전지' },
-  '086520': { name: '에코프로', sector: '2차전지' },
-  '352820': { name: '하이브', sector: '엔터' },
-  '196170': { name: '알테오젠', sector: '바이오' },
-  '443060': { name: '레인보우로보틱스', sector: 'AI/로봇' },
+  '009150': { name: '삼성전기', sector: '전자부품' },
   '042700': { name: '한미반도체', sector: '반도체장비' },
-  '012450': { name: '한화에어로스페이스', sector: '방산' },
-  '047810': { name: '한국항공우주', sector: '방산' },
   '058470': { name: '리노공업', sector: '반도체장비' },
-  '145020': { name: '휴젤', sector: '바이오' },
   '039030': { name: '이오테크닉스', sector: '반도체장비' },
-  '055550': { name: '신한지주', sector: '금융' },
-  '032830': { name: '삼성생명', sector: '보험' },
-  '395400': { name: '맥쿼리인프라', sector: '인프라' },
+  
+  // 2차전지/에너지
   '373220': { name: 'LG에너지솔루션', sector: '2차전지' },
   '006400': { name: '삼성SDI', sector: '2차전지' },
-  '035720': { name: '카카오', sector: 'IT서비스' },
+  '247540': { name: '에코프로비엠', sector: '2차전지' },
+  '086520': { name: '에코프로', sector: '2차전지' },
+  '051910': { name: 'LG화학', sector: '화학' },
+  
+  // 바이오/헬스케어
+  '207940': { name: '삼성바이오로직스', sector: '바이오' },
   '068270': { name: '셀트리온', sector: '바이오' },
+  '196170': { name: '알테오젠', sector: '바이오' },
+  '145020': { name: '휴젤', sector: '바이오' },
+  '326030': { name: 'SK바이오팜', sector: '바이오' },
+  
+  // 자동차
+  '005380': { name: '현대차', sector: '자동차' },
+  '000270': { name: '기아', sector: '자동차' },
+  '012330': { name: '현대모비스', sector: '자동차부품' },
+  
+  // IT서비스/플랫폼
+  '035720': { name: '카카오', sector: 'IT서비스' },
+  '035420': { name: 'NAVER', sector: 'IT서비스' },
+  '263750': { name: '펄어비스', sector: '게임' },
+  '259960': { name: '크래프톤', sector: '게임' },
+  
+  // 금융
+  '105560': { name: 'KB금융', sector: '금융' },
+  '055550': { name: '신한지주', sector: '금융' },
+  '086790': { name: '하나금융지주', sector: '금융' },
+  '316140': { name: '우리금융지주', sector: '금융' },
+  '032830': { name: '삼성생명', sector: '보험' },
+  
+  // 방산/우주항공
+  '012450': { name: '한화에어로스페이스', sector: '방산' },
+  '047810': { name: '한국항공우주', sector: '방산' },
+  '000880': { name: '한화', sector: '방산' },
+  '298040': { name: '효성중공업', sector: '중공업' },
+  
+  // AI/로봇
+  '443060': { name: '레인보우로보틱스', sector: 'AI/로봇' },
+  '454910': { name: '두산로보틱스', sector: 'AI/로봇' },
+  
+  // 통신/인프라
+  '017670': { name: 'SK텔레콤', sector: '통신' },
+  '030200': { name: 'KT', sector: '통신' },
+  '066570': { name: 'LG전자', sector: '가전' },
+  
+  // 철강/소재
+  '003670': { name: '포스코홀딩스', sector: '철강' },
+  '005490': { name: 'POSCO', sector: '철강' },
+  
+  // 엔터/미디어
+  '352820': { name: '하이브', sector: '엔터' },
+  '041510': { name: 'SM', sector: '엔터' },
+  '122870': { name: 'YG엔터', sector: '엔터' },
+  
+  // 인프라/리츠
+  '395400': { name: '맥쿼리인프라', sector: '인프라' },
 };
 
 // Convert DB format to Calendar format with real-time prices
