@@ -481,8 +481,14 @@ export async function GET(
   const useOpenRouter = !!process.env.OPENROUTER_API_KEY;
   
   try {
-    if (useOpenRouter) {
-      // OpenRouter 사용 (모든 모델을 하나의 API로)
+    // GPT는 항상 직접 OpenAI API 사용 (OpenRouter 모델 호환성 이슈)
+    // Claude/Gemini는 OpenRouter가 있으면 OpenRouter 사용
+    if (heroId === 'gpt') {
+      // GPT: 직접 OpenAI API 사용
+      console.log(`[${heroId}] Using direct OpenAI API`);
+      top5 = await analyzeWithGPT(ANALYSIS_STOCKS, realPrices);
+    } else if (useOpenRouter) {
+      // Claude/Gemini: OpenRouter 사용
       console.log(`[${heroId}] Using OpenRouter for analysis`);
       top5 = await analyzeWithOpenRouter(heroId, ANALYSIS_STOCKS, realPrices);
     } else {
@@ -493,9 +499,6 @@ export async function GET(
           break;
         case 'gemini':
           top5 = await analyzeWithGemini(ANALYSIS_STOCKS, realPrices);
-          break;
-        case 'gpt':
-          top5 = await analyzeWithGPT(ANALYSIS_STOCKS, realPrices);
           break;
       }
     }
