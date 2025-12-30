@@ -90,8 +90,24 @@ export function Calendar({ onDateSelect }: CalendarProps) {
       const data = await res.json();
       if (data.success) {
         const verdictMap: Record<string, DailyVerdict> = {};
-        data.data.forEach((v: DailyVerdict) => {
-          verdictMap[v.date] = v;
+        // API returns 'verdicts' not 'data'
+        const verdictArray = data.verdicts || data.data || [];
+        verdictArray.forEach((v: any) => {
+          // Map API response format to component format
+          verdictMap[v.date] = {
+            date: v.date,
+            isGenerated: true,
+            top5: (v.top5 || []).map((item: any) => ({
+              rank: item.rank,
+              symbolCode: item.symbol || item.symbolCode,
+              symbolName: item.name || item.symbolName,
+              sector: item.sector || '기타',
+              avgScore: item.avgScore || 0,
+              claudeScore: item.claudeScore,
+              geminiScore: item.geminiScore,
+              gptScore: item.gptScore,
+            })),
+          };
         });
         setVerdicts(verdictMap);
       }
