@@ -494,7 +494,20 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Supabase INSERT error:', error);
-      throw error;
+      return NextResponse.json({
+        success: false,
+        error: error.message,
+        details: error,
+        insertData: { date: insertData.date, top5Count: insertData.top5?.length },
+      }, { status: 500 });
+    }
+    
+    if (!verdict) {
+      return NextResponse.json({
+        success: false,
+        error: 'No verdict returned after insert',
+        insertData: { date: insertData.date },
+      }, { status: 500 });
     }
 
     console.log(`[${today}] Verdict saved successfully!`);
