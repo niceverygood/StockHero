@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchMultipleStockPrices } from '@/lib/market-data/kis';
 
+// Disable caching for this API route
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // Supabase Client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
