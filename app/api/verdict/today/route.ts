@@ -1,91 +1,75 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
-// Mock today's verdict (in production, fetch from DB)
-function getMockVerdict() {
-  const today = new Date().toISOString().split('T')[0];
-  
-  return {
-    id: `verdict-${today}`,
-    date: today,
-    top5: [
-      {
-        rank: 1,
-        symbolId: '1',
-        symbol: '005930',
-        name: '삼성전자',
-        avgScore: 4.7,
-        rationale: '세 분석가 모두 삼성전자에 대해 4점 이상의 긍정적 평가를 내렸습니다. 반도체 업종 내 경쟁력을 갖추고 있습니다.',
-        hasUnanimous: true,
-        riskFlags: ['글로벌 경기 둔화', '환율 변동'],
-      },
-      {
-        rank: 2,
-        symbolId: '2',
-        symbol: '000660',
-        name: 'SK하이닉스',
-        avgScore: 4.5,
-        rationale: 'Gemi Nine가 5점으로 가장 높게 평가했습니다. HBM 수요 증가에 따른 수혜가 예상됩니다.',
-        hasUnanimous: true,
-        riskFlags: ['메모리 가격 변동', '경쟁 심화'],
-      },
-      {
-        rank: 3,
-        symbolId: '3',
-        symbol: '373220',
-        name: 'LG에너지솔루션',
-        avgScore: 4.3,
-        rationale: '2차전지 업종 내 글로벌 경쟁력을 갖추고 있습니다. 다만, 원자재 가격 변동 리스크가 있습니다.',
-        hasUnanimous: false,
-        riskFlags: ['원자재 가격', '보조금 정책'],
-      },
-      {
-        rank: 4,
-        symbolId: '7',
-        symbol: '035720',
-        name: '카카오',
-        avgScore: 4.2,
-        rationale: 'IT서비스 업종 내 플랫폼 경쟁력이 있습니다. 신규 비즈니스 모델에 대한 기대감이 반영되었습니다.',
-        hasUnanimous: false,
-        riskFlags: ['규제 리스크', '광고 시장 둔화'],
-      },
-      {
-        rank: 5,
-        symbolId: '10',
-        symbol: '068270',
-        name: '셀트리온',
-        avgScore: 4.1,
-        rationale: '바이오시밀러 시장 점유율 확대가 긍정적입니다. 신약 파이프라인도 기대됩니다.',
-        hasUnanimous: false,
-        riskFlags: ['신약 개발 불확실성', '가격 경쟁'],
-      },
-    ],
-    rationale: 'Top 5 중 2개 종목이 만장일치 합의를 얻었습니다. 반도체, 2차전지, IT서비스 업종에 대한 선호가 두드러집니다.',
-    totalCandidates: 20,
-    unanimousCount: 2,
-    createdAt: new Date().toISOString(),
-  };
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+// 요일별 테마 정보
+const DAY_THEMES: Record<number, { name: string; emoji: string }> = {
+  0: { name: '종합 밸런스', emoji: '⚖️' },
+  1: { name: '성장주 포커스', emoji: '🚀' },
+  2: { name: '배당 투자', emoji: '💰' },
+  3: { name: '가치 투자', emoji: '💎' },
+  4: { name: '테마 & 트렌드', emoji: '🔥' },
+  5: { name: '블루칩', emoji: '🏆' },
+  6: { name: '히든 젬', emoji: '🌟' },
+};
 
 export async function GET() {
   try {
-    const verdict = getMockVerdict();
-    
+    // 한국 시간 기준 오늘 날짜
+    const now = new Date();
+    const kstOffset = 9 * 60;
+    const kstTime = new Date(now.getTime() + (kstOffset + now.getTimezoneOffset()) * 60 * 1000);
+    const today = kstTime.toISOString().split('T')[0];
+    const dayOfWeek = kstTime.getDay();
+    const theme = DAY_THEMES[dayOfWeek];
+
+    // DB에서 오늘의 verdict 조회
+    const { data: verdict, error } = await supabase
+      .from('verdicts')
+      .select('*')
+      .eq('date', today)
+      .single();
+
+    if (error || !verdict) {
+      return NextResponse.json({
+        success: true,
+        verdict: null,
+        message: '오늘의 추천이 아직 없습니다',
+      });
+    }
+
+    // 데이터 포맷팅
+    const top5 = (verdict.top5 || []).map((item: any, idx: number) => ({
+      rank: item.rank || idx + 1,
+      symbol: item.symbol,
+      name: item.name,
+      avgScore: item.avgScore || 0,
+      claudeScore: item.claudeScore || 0,
+      geminiScore: item.geminiScore || 0,
+      gptScore: item.gptScore || 0,
+      isUnanimous: item.isUnanimous || false,
+      reason: item.reason || '',
+    }));
+
     return NextResponse.json({
       success: true,
-      data: verdict,
+      verdict: {
+        date: verdict.date,
+        theme: theme,
+        top5: top5,
+        consensusSummary: verdict.consensus_summary || '',
+      },
     });
+
   } catch (error) {
+    console.error('Today verdict error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch today verdict' },
       { status: 500 }
     );
   }
 }
-
-
-
-
-
-
-
-

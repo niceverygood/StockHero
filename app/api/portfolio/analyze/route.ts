@@ -1,176 +1,158 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
+// OpenRouter API
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 
-interface ExtractedHolding {
-  symbolCode: string;
-  symbolName: string;
+interface PortfolioItem {
+  symbol: string;
+  name: string;
   quantity: number;
-  avgPrice: number;
-  currentPrice: number;
-  totalValue: number;
-  profit: number;
-  profitRate: number;
+  avgPrice?: number;
 }
 
-interface ExtractedPortfolio {
-  holdings: ExtractedHolding[];
-  totalValue: number;
-  totalInvested: number;
-  totalProfit: number;
-  profitRate: number;
-  accountInfo?: string;
+interface AIAdvice {
+  symbol: string;
+  name: string;
+  action: 'hold' | 'increase' | 'decrease' | 'sell';
+  reason: string;
 }
 
-const ANALYSIS_PROMPT = `당신은 증권사 HTS/MTS 스크린샷을 분석하는 전문가입니다.
-이미지에서 주식 보유 현황을 추출해주세요.
+async function getAIAnalysis(portfolio: PortfolioItem[], model: string): Promise<any> {
+  const portfolioText = portfolio.map(p => 
+    `- ${p.name}(${p.symbol}): ${p.quantity}주${p.avgPrice ? `, 평균단가 ${p.avgPrice.toLocaleString()}원` : ''}`
+  ).join('\n');
 
-다음 JSON 형식으로만 응답해주세요. 다른 텍스트 없이 JSON만 출력:
+  const prompt = `당신은 투자 분석 전문가입니다. 다음 포트폴리오를 분석해주세요.
+
+[포트폴리오]
+${portfolioText}
+
+다음 JSON 형식으로만 응답하세요:
 {
-  "holdings": [
+  "riskLevel": "low" | "medium" | "high",
+  "diversificationScore": 1-10 점수,
+  "advice": [
     {
-      "symbolCode": "종목코드 (6자리 숫자, 모르면 빈 문자열)",
-      "symbolName": "종목명",
-      "quantity": 보유수량 (숫자),
-      "avgPrice": 평균단가 (숫자, 모르면 0),
-      "currentPrice": 현재가 (숫자),
-      "totalValue": 평가금액 (숫자),
-      "profit": 평가손익 (숫자, 손실이면 음수),
-      "profitRate": 수익률 (%, 손실이면 음수)
+      "symbol": "종목코드",
+      "name": "종목명",
+      "action": "hold" | "increase" | "decrease" | "sell",
+      "reason": "20자 이내 간단한 이유"
     }
   ],
-  "totalValue": 총평가금액 (숫자),
-  "totalInvested": 총매입금액 (숫자, 모르면 0),
-  "totalProfit": 총평가손익 (숫자),
-  "profitRate": 총수익률 (%),
-  "accountInfo": "계좌 정보나 증권사명 (있으면)"
+  "summary": "50자 이내 종합 의견"
 }
 
-주의사항:
-1. 이미지에서 보이는 모든 종목을 추출하세요
-2. 숫자에서 쉼표(,)를 제거하고 순수 숫자로 변환하세요
-3. 수익률이 음수면 손실입니다
-4. 확실하지 않은 정보는 0이나 빈 문자열로 처리하세요
-5. 종목코드를 모르면 종목명만이라도 정확히 추출하세요`;
+JSON만 출력하세요.`;
+
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 1500,
+      temperature: 0.7,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || '';
+  
+  // Extract JSON
+  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    return JSON.parse(jsonMatch[0]);
+  }
+  
+  throw new Error('Failed to parse AI response');
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
-    const file = formData.get('image') as File | null;
+    const { portfolio } = await request.json();
     
-    if (!file) {
+    if (!portfolio || portfolio.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'No image provided' },
+        { success: false, error: 'Portfolio is empty' },
         { status: 400 }
       );
     }
 
-    // Convert file to base64
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const base64Image = buffer.toString('base64');
-    const mimeType = file.type || 'image/png';
+    // Get analysis from multiple AIs
+    const models = [
+      'anthropic/claude-3.5-sonnet',
+      'google/gemini-2.0-flash-001',
+      'openai/gpt-4o',
+    ];
 
-    // Call GPT-4o Vision API
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: ANALYSIS_PROMPT },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:${mimeType};base64,${base64Image}`,
-                detail: 'high',
-              },
-            },
-          ],
-        },
-      ],
-      max_tokens: 4096,
-    });
+    let bestAnalysis = null;
+    let lastError = null;
 
-    const content = response.choices[0]?.message?.content || '';
-    
-    // Extract JSON from response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return NextResponse.json(
-        { success: false, error: 'Failed to parse portfolio data from image' },
-        { status: 400 }
-      );
+    // Try each model until one succeeds
+    for (const model of models) {
+      try {
+        const analysis = await getAIAnalysis(portfolio, model);
+        
+        // Validate structure
+        if (analysis.riskLevel && analysis.advice && analysis.summary) {
+          // Ensure all portfolio items have advice
+          const adviceMap = new Map(analysis.advice.map((a: any) => [a.symbol, a]));
+          const completeAdvice = portfolio.map((p: PortfolioItem) => {
+            const existing = adviceMap.get(p.symbol);
+            if (existing) return existing;
+            return {
+              symbol: p.symbol,
+              name: p.name,
+              action: 'hold',
+              reason: '추가 분석 필요',
+            };
+          });
+
+          bestAnalysis = {
+            ...analysis,
+            advice: completeAdvice,
+          };
+          break;
+        }
+      } catch (e) {
+        lastError = e;
+        console.error(`Model ${model} failed:`, e);
+        continue;
+      }
     }
 
-    const extractedData: ExtractedPortfolio = JSON.parse(jsonMatch[0]);
-
-    // Add weight calculation
-    const totalValue = extractedData.totalValue || extractedData.holdings.reduce((sum, h) => sum + h.totalValue, 0);
-    const holdingsWithWeight = extractedData.holdings.map(holding => ({
-      ...holding,
-      weight: totalValue > 0 ? Number(((holding.totalValue / totalValue) * 100).toFixed(2)) : 0,
-    }));
-
-    // Fill in missing symbol codes with common stocks
-    const KNOWN_STOCKS: Record<string, string> = {
-      '삼성전자': '005930',
-      'SK하이닉스': '000660',
-      'LG에너지솔루션': '373220',
-      '삼성바이오로직스': '207940',
-      '현대차': '005380',
-      '현대자동차': '005380',
-      '삼성SDI': '006400',
-      '카카오': '035720',
-      '네이버': '035420',
-      'NAVER': '035420',
-      'LG화학': '051910',
-      '기아': '000270',
-      'KB금융': '105560',
-      '신한지주': '055550',
-      '셀트리온': '068270',
-      '포스코홀딩스': '003670',
-      'LG전자': '066570',
-      '삼성물산': '028260',
-      '현대모비스': '012330',
-      'SK이노베이션': '096770',
-      'SK': '034730',
-      'LG': '003550',
-      '삼성화재': '000810',
-      '하나금융지주': '086790',
-      '우리금융지주': '316140',
-    };
-
-    const enrichedHoldings = holdingsWithWeight.map(holding => ({
-      ...holding,
-      symbolCode: holding.symbolCode || KNOWN_STOCKS[holding.symbolName] || '',
-    }));
+    if (!bestAnalysis) {
+      // Fallback response
+      bestAnalysis = {
+        riskLevel: portfolio.length < 3 ? 'high' : portfolio.length < 5 ? 'medium' : 'low',
+        diversificationScore: Math.min(portfolio.length * 2, 10),
+        advice: portfolio.map((p: PortfolioItem) => ({
+          symbol: p.symbol,
+          name: p.name,
+          action: 'hold' as const,
+          reason: '현재 상태 유지 권장',
+        })),
+        summary: `${portfolio.length}개 종목 보유 중. ${portfolio.length < 3 ? '분산투자를 권장합니다.' : '적절한 분산투자 상태입니다.'}`,
+      };
+    }
 
     return NextResponse.json({
       success: true,
-      data: {
-        holdings: enrichedHoldings,
-        totalValue: totalValue,
-        totalInvested: extractedData.totalInvested || 0,
-        totalProfit: extractedData.totalProfit || 0,
-        profitRate: extractedData.profitRate || 0,
-        accountInfo: extractedData.accountInfo,
-      },
+      analysis: bestAnalysis,
     });
+
   } catch (error) {
     console.error('Portfolio analysis error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to analyze portfolio image' },
+      { success: false, error: 'Failed to analyze portfolio' },
       { status: 500 }
     );
   }
 }
-
-
-
-
-
-
-
-

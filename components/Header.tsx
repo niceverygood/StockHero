@@ -5,56 +5,54 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { UserMenu } from './UserMenu';
 
-const NAV_LINKS: { href: string; label: string; highlight?: boolean }[] = [
-  { href: '/verdict', label: 'Top 5' },
-  { href: '/heroes', label: 'Stock Heros' },
-  { href: '/us-stocks', label: '🇺🇸 US Stocks' },
-  { href: '/themes', label: '🔥 Hot Themes' },
-  { href: '/battle', label: 'Watch Debate' },
-  { href: '/consulting', label: 'Consulting' },
-  { href: '/investment-style', label: '🧬 투자성향' },
-  { href: '/subscription', label: '💎 구독', highlight: true },
+const NAV_LINKS: { href: string; label: string; icon: string }[] = [
+  { href: '/', label: '오늘의 Top 5', icon: '🏆' },
+  { href: '/calendar', label: '추천 달력', icon: '📅' },
+  { href: '/portfolio', label: '포폴 분석', icon: '📊' },
+  { href: '/consult', label: 'AI 상담', icon: '💬' },
 ];
 
 export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
+  const isActive = (href: string) => {
+    if (href === '/') return pathname === '/';
+    return pathname === href || pathname.startsWith(href + '/');
+  };
 
   return (
-    <header className="fixed top-[41px] left-0 right-0 z-40">
-      <div className="container-app py-2 sm:py-4">
-        <nav className="glass rounded-xl sm:rounded-2xl px-3 sm:px-6 py-2 sm:py-3">
+    <header className="fixed top-0 left-0 right-0 z-50">
+      <div className="container-app py-3">
+        <nav className="glass rounded-2xl px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between">
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-2 group shrink-0">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
-                <span className="text-white font-bold text-xs sm:text-sm">S</span>
+            <Link href="/" className="flex items-center gap-2.5 group shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/20">
+                <span className="text-white font-bold text-base">S</span>
               </div>
-              <span className="font-semibold text-dark-100 group-hover:text-white transition-colors text-sm sm:text-base">
+              <span className="font-bold text-dark-50 group-hover:text-white transition-colors text-lg hidden sm:block">
                 StockHero
               </span>
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-1">
+            <div className="hidden md:flex items-center gap-2">
               {NAV_LINKS.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`px-2 lg:px-3 xl:px-4 py-2 text-xs lg:text-sm rounded-lg transition-all whitespace-nowrap ${
-                    link.highlight
-                      ? 'bg-gradient-to-r from-brand-500 to-purple-500 text-white font-medium hover:opacity-90'
-                      : isActive(link.href)
-                      ? 'text-brand-400 bg-brand-500/10'
-                      : 'text-dark-400 hover:text-dark-100 hover:bg-dark-800/50'
+                  className={`px-4 py-2.5 text-sm font-medium rounded-xl transition-all flex items-center gap-2 ${
+                    isActive(link.href)
+                      ? 'text-white bg-brand-500/20 border border-brand-500/30'
+                      : 'text-dark-300 hover:text-white hover:bg-dark-800/60'
                   }`}
                 >
+                  <span>{link.icon}</span>
                   {link.label}
                 </Link>
               ))}
-              <div className="ml-3 lg:ml-4 pl-3 lg:pl-4 border-l border-dark-700">
+              <div className="ml-4 pl-4 border-l border-dark-700">
                 <UserMenu />
               </div>
             </div>
@@ -64,7 +62,7 @@ export function Header() {
               <UserMenu />
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="p-2 text-dark-400 hover:text-dark-100 hover:bg-dark-800/50 rounded-lg transition-all"
+                className="p-2.5 text-dark-300 hover:text-white hover:bg-dark-800/60 rounded-xl transition-all"
                 aria-label="메뉴 열기"
               >
                 {isMobileMenuOpen ? (
@@ -82,21 +80,20 @@ export function Header() {
 
           {/* Mobile Navigation */}
           {isMobileMenuOpen && (
-            <div className="md:hidden mt-3 pt-3 border-t border-dark-700/50">
-              <div className="flex flex-col gap-1">
+            <div className="md:hidden mt-4 pt-4 border-t border-dark-700/50">
+              <div className="grid grid-cols-2 gap-2">
                 {NAV_LINKS.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className={`px-3 py-2.5 text-sm rounded-lg transition-all ${
-                      link.highlight
-                        ? 'bg-gradient-to-r from-brand-500 to-purple-500 text-white font-medium'
-                        : isActive(link.href)
-                        ? 'text-brand-400 bg-brand-500/10'
-                        : 'text-dark-300 hover:text-dark-100 hover:bg-dark-800/50'
+                    className={`px-4 py-3 text-sm font-medium rounded-xl transition-all flex items-center gap-2 ${
+                      isActive(link.href)
+                        ? 'text-white bg-brand-500/20 border border-brand-500/30'
+                        : 'text-dark-300 hover:text-white hover:bg-dark-800/60 border border-dark-800/50'
                     }`}
                   >
+                    <span className="text-lg">{link.icon}</span>
                     {link.label}
                   </Link>
                 ))}
