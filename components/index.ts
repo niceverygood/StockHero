@@ -23,3 +23,4 @@ export { MissedProfitCalculator } from './MissedProfitCalculator';
 export { UrgentAlertBanner } from './UrgentAlertBanner';
 export { default as ShareButtons } from './ShareButtons';
 export { RecommendationCalendar } from './RecommendationCalendar';
+export { NotificationBell } from './NotificationBell';
