@@ -4,6 +4,7 @@ import { fetchMultipleNaverPrices } from '@/lib/market-data/naver';
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getSubscriptionInfo, PLAN_LIMITS, type PlanName } from '@/lib/subscription/guard';
 
 // API 사용 여부 확인
 const useKISAPI = !!(process.env.KIS_APP_KEY && process.env.KIS_APP_SECRET);
@@ -465,6 +466,12 @@ export async function GET(
   if (!profile) {
     return NextResponse.json({ error: 'Hero not found' }, { status: 404 });
   }
+
+  // ==================== 구독 정보 조회 ====================
+  const subInfo = await getSubscriptionInfo(request);
+  const planName = (subInfo?.planName || 'free') as PlanName;
+  const limits = PLAN_LIMITS[planName] || PLAN_LIMITS.free;
+  // ======================================================
   
   // 1. 실시간 가격 조회
   const symbols = ANALYSIS_STOCKS.map(s => s.symbol);
@@ -612,7 +619,46 @@ export async function GET(
     };
   });
   
-  // 5. 응답
+  // 5. 구독 기반 데이터 필터링
+  let filteredStocks = stocksWithPrices;
+
+  // 무료 플랜: 3~5위만 공개
+  if (planName === 'free') {
+    filteredStocks = stocksWithPrices.map((stock, idx) => {
+      const rank = idx + 1;
+      if (rank <= 2) {
+        // 1~2위는 종목명만 블러
+        return {
+          ...stock,
+          name: '🔒 프리미엄 전용',
+          symbol: '******',
+          reason: '상위 종목을 확인하려면 베이직 플랜 이상이 필요합니다.',
+          targetPrice: null,
+          expectedReturn: null,
+          risks: [],
+          isLocked: true,
+        };
+      }
+      // 3~5위는 공개하되 목표가 제외
+      return {
+        ...stock,
+        targetPrice: null,
+        expectedReturn: null,
+      };
+    });
+  }
+
+  // 베이직 플랜: 목표가만 공개 (목표달성일 제외)
+  if (planName === 'basic') {
+    filteredStocks = stocksWithPrices.map(stock => ({
+      ...stock,
+      targetDate: null, // 목표달성일 제외
+    }));
+  }
+
+  // 프로/VIP: 전체 공개 (목표달성일 포함)
+
+  // 6. 응답
   const now = new Date();
   return NextResponse.json({
     hero: {
@@ -627,6 +673,12 @@ export async function GET(
     time: now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
     isRealTime: realPrices.size > 0,
     isAIGenerated: true,
-    stocks: stocksWithPrices,
+    stocks: filteredStocks,
+    subscription: {
+      plan: planName,
+      showTargetPrice: limits.showTargetPrice,
+      showTargetDate: limits.showTargetDate,
+      visibleCount: limits.top5Visible,
+    },
   });
 }

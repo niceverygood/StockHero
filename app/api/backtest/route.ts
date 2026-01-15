@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getSubscriptionInfo, PLAN_LIMITS, type PlanName } from '@/lib/subscription/guard';
+import { BACKTEST_DAYS_LIMITS } from '@/lib/rate-limiter';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -51,8 +53,29 @@ interface BacktestResult {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const startDate = searchParams.get('startDate') || '2025-09-01';
-    const endDate = searchParams.get('endDate') || new Date().toISOString().split('T')[0];
+    
+    // ==================== 구독 기반 기간 제한 ====================
+    const subInfo = await getSubscriptionInfo(request);
+    const planName = (subInfo?.planName || 'free') as PlanName;
+    const maxDays = BACKTEST_DAYS_LIMITS[planName as keyof typeof BACKTEST_DAYS_LIMITS] || 7;
+
+    // 최대 조회 가능 기간 계산
+    const today = new Date();
+    const maxStartDate = new Date(today);
+    maxStartDate.setDate(maxStartDate.getDate() - maxDays);
+    
+    let requestedStartDate = searchParams.get('startDate') || maxStartDate.toISOString().split('T')[0];
+    const endDate = searchParams.get('endDate') || today.toISOString().split('T')[0];
+
+    // 요청된 기간이 제한을 초과하면 제한 적용
+    const requestedStart = new Date(requestedStartDate);
+    if (requestedStart < maxStartDate) {
+      requestedStartDate = maxStartDate.toISOString().split('T')[0];
+    }
+
+    const startDate = requestedStartDate;
+    const isLimited = planName !== 'vip';
+    // ============================================================
 
     // DB에서 해당 기간의 모든 verdict 조회
     const { data: verdicts, error } = await supabase
@@ -207,6 +230,15 @@ export async function GET(request: NextRequest) {
       success: true,
       summary,
       results: results.slice(0, 50), // Top 50
+      subscription: {
+        plan: planName,
+        maxDays,
+        isLimited,
+        message: isLimited 
+          ? `${planName === 'free' ? '무료' : planName} 플랜은 최대 ${maxDays}일까지 조회 가능합니다.`
+          : null,
+        upgradeUrl: isLimited ? '/pricing' : null,
+      },
     });
   } catch (error) {
     console.error('Backtest error:', error);

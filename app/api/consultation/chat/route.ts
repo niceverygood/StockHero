@@ -4,8 +4,10 @@ import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getSystemPromptWithHoldings, AI_PERSONAS } from '@/lib/ai-personas';
 import type { CharacterType } from '@/lib/llm/types';
-import { getMarketContext, searchStockNews } from '@/lib/market-data/news';
+import { searchStockNews } from '@/lib/market-data/news';
 import { chatWithOpenRouter } from '@/lib/llm/openrouter';
+import { getSubscriptionInfo, incrementDailyUsage, PLAN_LIMITS, type PlanName } from '@/lib/subscription/guard';
+import { checkRateLimit, CONTENT_LENGTH_LIMITS } from '@/lib/rate-limiter';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -391,6 +393,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ==================== 구독 기반 접근 제어 ====================
+    const subInfo = await getSubscriptionInfo(request);
+    const planName = subInfo?.planName || 'free';
+    const userId = subInfo?.userId || 'anonymous';
+    const limits = PLAN_LIMITS[planName as PlanName] || PLAN_LIMITS.free;
+    const contentLimits = CONTENT_LENGTH_LIMITS[planName as keyof typeof CONTENT_LENGTH_LIMITS] || CONTENT_LENGTH_LIMITS.free;
+
+    // 1. 사용량 체크 (일일 상담 횟수)
+    if (limits.consultationPerDay !== -1) {
+      const rateLimit = await checkRateLimit(userId, 'ai_consultations', planName);
+      if (!rateLimit.allowed) {
+        return NextResponse.json({
+          success: false,
+          error: 'usage_limit_exceeded',
+          message: `오늘 AI 상담 횟수를 모두 사용했습니다. (${rateLimit.used}/${rateLimit.limit}회)`,
+          used: rateLimit.used,
+          limit: rateLimit.limit,
+          resetAt: rateLimit.resetAt,
+          upgradeUrl: '/pricing',
+        }, { status: 429 });
+      }
+    }
+
+    // 2. 입력 길이 제한
+    const lastUserMessage = messages.filter(m => m.role === 'user').pop()?.content || '';
+    if (lastUserMessage.length > contentLimits.consultationInput) {
+      return NextResponse.json({
+        success: false,
+        error: 'content_too_long',
+        message: `질문이 너무 깁니다. ${planName === 'free' ? '무료' : planName} 플랜은 ${contentLimits.consultationInput}자까지 입력 가능합니다.`,
+        maxLength: contentLimits.consultationInput,
+        currentLength: lastUserMessage.length,
+        upgradeUrl: '/pricing',
+      }, { status: 400 });
+    }
+    // ============================================================
+
     // Get the system prompt with holdings info and current market context
     let systemPrompt = getSystemPromptWithHoldings(characterType, holdings);
     
@@ -482,6 +521,20 @@ ${stockData.volume ? `- **거래량**: ${stockData.volume.toLocaleString()}주` 
     const today = new Date();
     const todayStr = today.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
     systemPrompt += `\n\n## 📅 현재 날짜: ${todayStr}\n`;
+
+    // VIP 전용 심층 분석 프롬프트 추가
+    if (planName === 'vip' && (limits as any).deepAnalysis) {
+      systemPrompt += `
+
+## 👑 VIP 전용 심층 분석 모드
+이 사용자는 VIP 회원입니다. 다음 추가 분석을 제공하세요:
+1. **기관/외국인 수급 트렌드 분석**
+2. **차트 기술적 분석** (지지/저항선, 이동평균선)
+3. **업종 내 상대강도 비교**
+4. **구체적인 매수/매도 타이밍 제안**
+5. **리스크 관리 전략** (손절가, 목표가 구체적 제시)
+`;
+    }
 
     // 토론 모드 지침 추가
     if (isDebateMode) {
@@ -618,13 +671,37 @@ ${queryKeyword} 관련 최신 뉴스를 찾지 못했습니다.
       }, { status: 503 });
     }
 
+    // 응답 길이 제한 적용
+    let finalContent = responseContent;
+    if (finalContent.length > contentLimits.consultationOutput) {
+      finalContent = finalContent.slice(0, contentLimits.consultationOutput) + '\n\n...(더 자세한 분석은 업그레이드 후 확인하세요)';
+    }
+
+    // 사용량 증가 (성공 시)
+    if (userId !== 'anonymous') {
+      await incrementDailyUsage(userId, 'ai_consultations');
+    }
+
+    // 남은 사용량 계산
+    let usageInfo = null;
+    if (limits.consultationPerDay !== -1) {
+      const rateLimit = await checkRateLimit(userId, 'ai_consultations', planName);
+      usageInfo = {
+        used: rateLimit.used + 1,
+        limit: rateLimit.limit,
+        remaining: Math.max(0, rateLimit.remaining - 1),
+      };
+    }
+
     return NextResponse.json({
       success: true,
       data: {
-        content: responseContent,
+        content: finalContent,
         characterType,
         timestamp: new Date().toISOString(),
       },
+      usage: usageInfo,
+      plan: planName,
     });
   } catch (error) {
     console.error('Consultation chat error:', error);

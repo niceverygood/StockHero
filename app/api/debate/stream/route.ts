@@ -1,7 +1,9 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getOrCreateSession } from '@/lib/llm';
 import { createDebateMessage, updateDebateSession } from '@/lib/supabase';
 import type { CharacterType } from '@/lib/types';
+import { getSubscriptionInfo, incrementDailyUsage, PLAN_LIMITS, type PlanName } from '@/lib/subscription/guard';
+import { checkRateLimit, DEBATE_DELAY } from '@/lib/rate-limiter';
 
 // Mock current prices for stocks
 const STOCK_PRICES: Record<string, number> = {
@@ -31,6 +33,33 @@ export async function POST(request: NextRequest) {
       headers: { 'Content-Type': 'application/json' },
     });
   }
+
+  // ==================== 구독 기반 접근 제어 ====================
+  const subInfo = await getSubscriptionInfo(request);
+  const planName = (subInfo?.planName || 'free') as PlanName;
+  const userId = subInfo?.userId || 'anonymous';
+  const limits = PLAN_LIMITS[planName] || PLAN_LIMITS.free;
+
+  // 1. 사용량 체크 (일일 토론 시청 횟수)
+  if (limits.debatePerDay !== -1) {
+    const rateLimit = await checkRateLimit(userId, 'debates', planName);
+    if (!rateLimit.allowed) {
+      return NextResponse.json({
+        success: false,
+        error: 'usage_limit_exceeded',
+        message: `오늘 AI 토론 시청 횟수를 모두 사용했습니다. (${rateLimit.used}/${rateLimit.limit}회)`,
+        used: rateLimit.used,
+        limit: rateLimit.limit,
+        resetAt: rateLimit.resetAt,
+        upgradeUrl: '/pricing',
+      }, { status: 429 });
+    }
+  }
+
+  // 2. 무료 플랜: 1일 지연 데이터 안내
+  const delay = DEBATE_DELAY[planName as keyof typeof DEBATE_DELAY] || 0;
+  const isDelayed = delay > 0;
+  // ============================================================
 
   const finalSymbol = symbol || '005930';
   const finalSymbolName = symbolName || '삼성전자';
@@ -113,6 +142,11 @@ export async function POST(request: NextRequest) {
           console.log('Failed to update session round:', e);
         }
 
+        // 사용량 증가 (1라운드 시작 시만)
+        if (round === 1 && userId !== 'anonymous') {
+          await incrementDailyUsage(userId, 'debates');
+        }
+
         // Send completion event with targets and consensus
         const targets = orchestrator.getTargets();
         const consensus = orchestrator.getConsensus();
@@ -127,6 +161,11 @@ export async function POST(request: NextRequest) {
             targets,
             consensus,
             isComplete,
+            subscription: {
+              plan: planName,
+              isDelayed,
+              delay: isDelayed ? '1일 지연 데이터입니다. 실시간 토론은 베이직 이상에서 이용 가능합니다.' : null,
+            },
           },
         })}\n\n`;
         

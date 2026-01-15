@@ -48,3 +48,15 @@ export {
   useCurrentPlan,
   usePlans,
 } from './hooks';
+
+// 서버사이드 가드
+export {
+  PLAN_LIMITS,
+  getSubscriptionInfo,
+  isPlanSufficient,
+  getDailyUsage,
+  incrementDailyUsage,
+  withSubscription,
+  checkPlanAccess,
+  type PlanName,
+} from './guard';
