@@ -139,8 +139,6 @@ export async function GET(request: NextRequest) {
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
 
-    console.log(`[Calendar API] Querying verdicts: ${startDate} to ${endDate}`);
-    
     const { data: dbVerdicts, error } = await supabase
       .from('verdicts')
       .select('date, top5, claude_top5, gemini_top5, gpt_top5, consensus_summary')
@@ -148,14 +146,11 @@ export async function GET(request: NextRequest) {
       .lte('date', endDate)
       .order('date', { ascending: true });
 
-    console.log(`[Calendar API] Query result: ${dbVerdicts?.length || 0} records, error: ${error?.message || 'none'}`);
-    
     if (error) {
       console.error('Supabase query error:', error);
       return NextResponse.json({
         success: false,
         error: error.message,
-        query: { startDate, endDate },
         message: 'AI 분석 데이터가 없습니다. 오늘의 분석을 생성해주세요.',
       });
     }
@@ -213,11 +208,6 @@ export async function GET(request: NextRequest) {
       verdicts: calendarVerdicts,
       dbCount: verdicts.length,
       todayHasData: verdicts.some(v => v.date === todayStr),
-      debug: {
-        query: { startDate, endDate },
-        rawCount: dbVerdicts?.length || 0,
-        dates: dbVerdicts?.map((v: any) => v.date) || [],
-      }
     });
   } catch (error) {
     console.error('Calendar verdicts error:', error);
