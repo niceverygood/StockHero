@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Header } from '@/components';
 import { CHARACTERS } from '@/lib/characters';
+import { KRX_ALL_STOCKS, searchStocksByName, type KRXStock } from '@/lib/data/krx-stocks';
 
 type CharacterType = 'claude' | 'gemini' | 'gpt';
 
@@ -18,22 +19,17 @@ interface Message {
   character?: CharacterType;
 }
 
-const POPULAR_STOCKS = [
-  { symbol: '005930', name: '삼성전자' },
-  { symbol: '000660', name: 'SK하이닉스' },
-  { symbol: '035720', name: '카카오' },
-  { symbol: '035420', name: 'NAVER' },
-  { symbol: '005380', name: '현대차' },
-  { symbol: '068270', name: '셀트리온' },
-];
-
 export default function ConsultPage() {
   const [selectedAI, setSelectedAI] = useState<CharacterType>('claude');
-  const [selectedStock, setSelectedStock] = useState<string | null>(null);
+  const [selectedStock, setSelectedStock] = useState<KRXStock | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<KRXStock[]>([]);
+  const [showResults, setShowResults] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   const char = CHARACTERS[selectedAI];
 
@@ -41,8 +37,33 @@ export default function ConsultPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const startConsultation = async (stock: { symbol: string; name: string }) => {
-    setSelectedStock(stock.name);
+  // 검색어 변경 시 검색 결과 업데이트
+  useEffect(() => {
+    if (searchQuery.trim().length >= 1) {
+      const results = searchStocksByName(searchQuery).slice(0, 10);
+      setSearchResults(results);
+      setShowResults(true);
+    } else {
+      setSearchResults([]);
+      setShowResults(false);
+    }
+  }, [searchQuery]);
+
+  // 외부 클릭 시 검색 결과 닫기
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowResults(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const startConsultation = async (stock: KRXStock) => {
+    setSelectedStock(stock);
+    setSearchQuery('');
+    setShowResults(false);
     setMessages([]);
     setLoading(true);
 
@@ -52,7 +73,7 @@ export default function ConsultPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           character: selectedAI,
-          stock: stock,
+          stock: { symbol: stock.symbol, name: stock.name },
           messages: [],
           isInitial: true,
         }),
@@ -68,6 +89,11 @@ export default function ConsultPage() {
       }
     } catch (error) {
       console.error('Failed to start consultation:', error);
+      setMessages([{
+        role: 'assistant',
+        content: `안녕하세요! ${stock.name}(${stock.symbol})에 대해 궁금한 점을 물어보세요.`,
+        character: selectedAI,
+      }]);
     } finally {
       setLoading(false);
     }
@@ -82,14 +108,12 @@ export default function ConsultPage() {
     setLoading(true);
 
     try {
-      const stock = POPULAR_STOCKS.find(s => s.name === selectedStock) || { symbol: '', name: selectedStock };
-      
       const res = await fetch('/api/consultation/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           character: selectedAI,
-          stock,
+          stock: { symbol: selectedStock.symbol, name: selectedStock.name },
           messages: [...messages, { role: 'user', content: userMessage }],
           isInitial: false,
         }),
@@ -113,6 +137,7 @@ export default function ConsultPage() {
   const resetConsultation = () => {
     setSelectedStock(null);
     setMessages([]);
+    setSearchQuery('');
   };
 
   return (
@@ -165,23 +190,72 @@ export default function ConsultPage() {
           </div>
 
           <div className="max-w-3xl mx-auto">
-            {/* Stock Selection */}
+            {/* Stock Search */}
             {!selectedStock && (
               <div className="bg-dark-900/80 border border-dark-800 rounded-2xl p-6">
                 <h2 className="text-lg font-bold text-dark-100 mb-4 text-center">
                   어떤 종목에 대해 상담하시겠어요?
                 </h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {POPULAR_STOCKS.map(stock => (
-                    <button
-                      key={stock.symbol}
-                      onClick={() => startConsultation(stock)}
-                      className="p-4 bg-dark-800/50 hover:bg-dark-700/50 rounded-xl transition-all text-left"
-                    >
-                      <p className="font-medium text-dark-100">{stock.name}</p>
-                      <p className="text-xs text-dark-500">{stock.symbol}</p>
-                    </button>
-                  ))}
+                
+                {/* Search Input */}
+                <div ref={searchRef} className="relative mb-6">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onFocus={() => searchQuery.length >= 1 && setShowResults(true)}
+                      placeholder="종목명 또는 종목코드로 검색..."
+                      className="w-full px-4 py-3 pl-11 bg-dark-800 border border-dark-700 rounded-xl text-dark-100 focus:outline-none focus:border-brand-500 placeholder:text-dark-500"
+                    />
+                    <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-dark-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+
+                  {/* Search Results Dropdown */}
+                  {showResults && searchResults.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-dark-800 border border-dark-700 rounded-xl overflow-hidden z-50 max-h-80 overflow-y-auto">
+                      {searchResults.map((stock) => (
+                        <button
+                          key={stock.symbol}
+                          onClick={() => startConsultation(stock)}
+                          className="w-full px-4 py-3 text-left hover:bg-dark-700/50 transition-colors flex items-center justify-between"
+                        >
+                          <div>
+                            <p className="font-medium text-dark-100">{stock.name}</p>
+                            <p className="text-xs text-dark-500">{stock.symbol} · {stock.market} · {stock.sector}</p>
+                          </div>
+                          <svg className="w-5 h-5 text-dark-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {showResults && searchQuery.length >= 1 && searchResults.length === 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-dark-800 border border-dark-700 rounded-xl p-4 text-center text-dark-500">
+                      검색 결과가 없습니다
+                    </div>
+                  )}
+                </div>
+
+                {/* Popular Stocks */}
+                <div>
+                  <p className="text-sm text-dark-500 mb-3">인기 종목</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {KRX_ALL_STOCKS.slice(0, 9).map(stock => (
+                      <button
+                        key={stock.symbol}
+                        onClick={() => startConsultation(stock)}
+                        className="p-3 bg-dark-800/50 hover:bg-dark-700/50 rounded-xl transition-all text-left"
+                      >
+                        <p className="font-medium text-dark-100 text-sm">{stock.name}</p>
+                        <p className="text-xs text-dark-500">{stock.symbol}</p>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -197,7 +271,7 @@ export default function ConsultPage() {
                     </div>
                     <div>
                       <p className="font-medium text-dark-100">{char.name}</p>
-                      <p className="text-xs text-dark-500">{selectedStock} 상담 중</p>
+                      <p className="text-xs text-dark-500">{selectedStock.name} ({selectedStock.symbol}) 상담 중</p>
                     </div>
                   </div>
                   <button
