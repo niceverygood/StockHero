@@ -492,46 +492,62 @@ export default function CalendarPage() {
                   {stockPrices[selectedStock.symbol] && (
                     <div className="grid grid-cols-2 gap-3 mb-4">
                       {/* 첫 추천일 대비 */}
-                      {selectedStock.firstRecommendPrice && selectedStock.firstRecommendPrice > 0 && (
-                        <div className="bg-dark-800/30 rounded-xl p-3">
-                          <p className="text-xs text-dark-500 mb-1">첫 추천 대비</p>
-                          <p className="text-sm text-dark-400">
-                            {formatPrice(selectedStock.firstRecommendPrice)}원
+                      <div className="bg-dark-800/30 rounded-xl p-3">
+                        <p className="text-xs text-dark-500 mb-1">첫 추천 대비</p>
+                        {selectedStock.firstRecommendPrice && selectedStock.firstRecommendPrice > 0 ? (
+                          <>
+                            <p className="text-sm text-dark-400">
+                              {formatPrice(selectedStock.firstRecommendPrice)}원
+                            </p>
+                            {(() => {
+                              const returnPct = calculateReturn(
+                                stockPrices[selectedStock.symbol].price,
+                                selectedStock.firstRecommendPrice!
+                              );
+                              return returnPct !== null ? (
+                                <p className={`text-lg font-bold ${getReturnColor(returnPct)}`}>
+                                  {getReturnSign(returnPct)}{returnPct.toFixed(2)}%
+                                </p>
+                              ) : null;
+                            })()}
+                          </>
+                        ) : (
+                          <p className="text-sm text-dark-500 italic">
+                            {selectedStock.firstRecommendDate}
+                            <br />
+                            <span className="text-xs">(가격 데이터 없음)</span>
                           </p>
-                          {(() => {
-                            const returnPct = calculateReturn(
-                              stockPrices[selectedStock.symbol].price,
-                              selectedStock.firstRecommendPrice!
-                            );
-                            return returnPct !== null ? (
-                              <p className={`text-lg font-bold ${getReturnColor(returnPct)}`}>
-                                {getReturnSign(returnPct)}{returnPct.toFixed(2)}%
-                              </p>
-                            ) : null;
-                          })()}
-                        </div>
-                      )}
+                        )}
+                      </div>
                       
                       {/* 평균 추천가 대비 */}
-                      {selectedStock.avgRecommendPrice && selectedStock.avgRecommendPrice > 0 && (
-                        <div className="bg-dark-800/30 rounded-xl p-3">
-                          <p className="text-xs text-dark-500 mb-1">평균 추천가 대비</p>
-                          <p className="text-sm text-dark-400">
-                            {formatPrice(selectedStock.avgRecommendPrice)}원
+                      <div className="bg-dark-800/30 rounded-xl p-3">
+                        <p className="text-xs text-dark-500 mb-1">평균 추천가 대비</p>
+                        {selectedStock.avgRecommendPrice && selectedStock.avgRecommendPrice > 0 ? (
+                          <>
+                            <p className="text-sm text-dark-400">
+                              {formatPrice(selectedStock.avgRecommendPrice)}원
+                            </p>
+                            {(() => {
+                              const returnPct = calculateReturn(
+                                stockPrices[selectedStock.symbol].price,
+                                selectedStock.avgRecommendPrice!
+                              );
+                              return returnPct !== null ? (
+                                <p className={`text-lg font-bold ${getReturnColor(returnPct)}`}>
+                                  {getReturnSign(returnPct)}{returnPct.toFixed(2)}%
+                                </p>
+                              ) : null;
+                            })()}
+                          </>
+                        ) : (
+                          <p className="text-sm text-dark-500 italic">
+                            {selectedStock.totalDays}회 추천
+                            <br />
+                            <span className="text-xs">(가격 데이터 없음)</span>
                           </p>
-                          {(() => {
-                            const returnPct = calculateReturn(
-                              stockPrices[selectedStock.symbol].price,
-                              selectedStock.avgRecommendPrice!
-                            );
-                            return returnPct !== null ? (
-                              <p className={`text-lg font-bold ${getReturnColor(returnPct)}`}>
-                                {getReturnSign(returnPct)}{returnPct.toFixed(2)}%
-                              </p>
-                            ) : null;
-                          })()}
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   )}
 
