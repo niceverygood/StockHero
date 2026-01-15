@@ -194,6 +194,9 @@ export async function GET(request: NextRequest) {
           claudeScore: item.claudeScore,
           geminiScore: item.geminiScore,
           gptScore: item.gptScore,
+          currentPrice: item.currentPrice || 0,
+          change: item.change || 0,
+          changePercent: item.changePercent || 0,
         })),
         // 각 AI별 개별 Top 5
         claudeTop5: dbVerdict?.claude_top5 || [],
