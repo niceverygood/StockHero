@@ -591,16 +591,16 @@ ${stockData.volume ? `- **거래량**: ${stockData.volume.toLocaleString()}주` 
     }
 
     // 최신 이슈/뉴스 감지 및 컨텍스트 추가
-    const lastUserMessage = conversationMessages.filter(m => m.role === 'user').pop()?.content || '';
+    const latestUserQuery = conversationMessages.filter(m => m.role === 'user').pop()?.content || '';
     const newsKeywords = [
       '최근', '요즘', '이슈', '뉴스', '소식', '발표', '분할', '상장', '공시', '실적', 
       '합병', '인수', '배당', '올해', '이번', '지금', '현재', '어제', '오늘', '분기',
       '공모', '상폐', 'IPO', '자사주', '유상증자', '무상증자', '분사', '스핀오프'
     ];
-    const needsNewsContext = newsKeywords.some(kw => lastUserMessage.includes(kw)) || isInitialAnalysis;
+    const needsNewsContext = newsKeywords.some(kw => latestUserQuery.includes(kw)) || isInitialAnalysis;
     
     // 종목명 또는 키워드 추출
-    const stockNameMatch = lastUserMessage.match(/([가-힣]+(?:전자|홀딩스|바이오|에너지|금융|지주|화학|에피스|소프트|텍|네트웍스|모비스|솔루션)?)/);
+    const stockNameMatch = latestUserQuery.match(/([가-힣]+(?:전자|홀딩스|바이오|에너지|금융|지주|화학|에피스|소프트|텍|네트웍스|모비스|솔루션)?)/);
     const queryKeyword = stockNameMatch?.[1] || stockData?.name || '';
     
     // 초기 분석이거나 뉴스 키워드가 있으면 항상 뉴스 가져오기
