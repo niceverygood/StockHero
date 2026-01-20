@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import Image from 'next/image';
 import { Header } from '@/components';
+import { CHARACTERS } from '@/lib/characters';
 
 interface Top5Item {
   rank: number;
@@ -551,17 +553,26 @@ export default function CalendarPage() {
                     {(selectedStock.claudeVotes + selectedStock.geminiVotes + selectedStock.gptVotes) > 0 ? (
                       <>
                         <div className="grid grid-cols-3 gap-2">
-                          <div className="text-center p-2 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                          <div className="text-center p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                            <div className="w-10 h-10 mx-auto mb-2 rounded-full overflow-hidden ring-2 ring-purple-500/30">
+                              <Image src={CHARACTERS.claude.image} alt="Claude" width={40} height={40} className="w-full h-full object-cover" />
+                            </div>
                             <p className="text-purple-400 text-lg font-bold">{selectedStock.claudeVotes}회</p>
-                            <p className="text-xs text-dark-500">🔵 Claude</p>
+                            <p className="text-xs text-dark-500">Claude</p>
                           </div>
-                          <div className="text-center p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                          <div className="text-center p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                            <div className="w-10 h-10 mx-auto mb-2 rounded-full overflow-hidden ring-2 ring-blue-500/30">
+                              <Image src={CHARACTERS.gemini.image} alt="Gemini" width={40} height={40} className="w-full h-full object-cover" />
+                            </div>
                             <p className="text-blue-400 text-lg font-bold">{selectedStock.geminiVotes}회</p>
-                            <p className="text-xs text-dark-500">🟣 Gemini</p>
+                            <p className="text-xs text-dark-500">Gemini</p>
                           </div>
-                          <div className="text-center p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                          <div className="text-center p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                            <div className="w-10 h-10 mx-auto mb-2 rounded-full overflow-hidden ring-2 ring-emerald-500/30">
+                              <Image src={CHARACTERS.gpt.image} alt="GPT" width={40} height={40} className="w-full h-full object-cover" />
+                            </div>
                             <p className="text-emerald-400 text-lg font-bold">{selectedStock.gptVotes}회</p>
-                            <p className="text-xs text-dark-500">🟢 GPT</p>
+                            <p className="text-xs text-dark-500">GPT</p>
                           </div>
                         </div>
                         {/* 만장일치 정보 */}
@@ -723,37 +734,43 @@ export default function CalendarPage() {
                               {/* AI별 점수 - 상세 데이터가 있을 때만 */}
                               {hasDetailedScores ? (
                                 <div className="grid grid-cols-3 gap-1.5">
-                                  <div className={`text-center py-1.5 rounded-lg ${
+                                  <div className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg ${
                                     rec.claudeScore > 0 
                                       ? 'bg-purple-500/20 border border-purple-500/30' 
                                       : 'bg-dark-800/50 border border-dark-700/30'
                                   }`}>
-                                    <span className="text-xs">🔵</span>
-                                    <span className={`ml-1 text-xs font-bold ${
+                                    <div className="w-5 h-5 rounded-full overflow-hidden">
+                                      <Image src={CHARACTERS.claude.image} alt="Claude" width={20} height={20} className="w-full h-full object-cover" />
+                                    </div>
+                                    <span className={`text-xs font-bold ${
                                       rec.claudeScore > 0 ? 'text-purple-400' : 'text-dark-600'
                                     }`}>
                                       {rec.claudeScore > 0 ? rec.claudeScore.toFixed(1) : '-'}
                                     </span>
                                   </div>
-                                  <div className={`text-center py-1.5 rounded-lg ${
+                                  <div className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg ${
                                     rec.geminiScore > 0 
                                       ? 'bg-blue-500/20 border border-blue-500/30' 
                                       : 'bg-dark-800/50 border border-dark-700/30'
                                   }`}>
-                                    <span className="text-xs">🟣</span>
-                                    <span className={`ml-1 text-xs font-bold ${
+                                    <div className="w-5 h-5 rounded-full overflow-hidden">
+                                      <Image src={CHARACTERS.gemini.image} alt="Gemini" width={20} height={20} className="w-full h-full object-cover" />
+                                    </div>
+                                    <span className={`text-xs font-bold ${
                                       rec.geminiScore > 0 ? 'text-blue-400' : 'text-dark-600'
                                     }`}>
                                       {rec.geminiScore > 0 ? rec.geminiScore.toFixed(1) : '-'}
                                     </span>
                                   </div>
-                                  <div className={`text-center py-1.5 rounded-lg ${
+                                  <div className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg ${
                                     rec.gptScore > 0 
                                       ? 'bg-emerald-500/20 border border-emerald-500/30' 
                                       : 'bg-dark-800/50 border border-dark-700/30'
                                   }`}>
-                                    <span className="text-xs">🟢</span>
-                                    <span className={`ml-1 text-xs font-bold ${
+                                    <div className="w-5 h-5 rounded-full overflow-hidden">
+                                      <Image src={CHARACTERS.gpt.image} alt="GPT" width={20} height={20} className="w-full h-full object-cover" />
+                                    </div>
+                                    <span className={`text-xs font-bold ${
                                       rec.gptScore > 0 ? 'text-emerald-400' : 'text-dark-600'
                                     }`}>
                                       {rec.gptScore > 0 ? rec.gptScore.toFixed(1) : '-'}
