@@ -2,6 +2,9 @@ import { createBrowserClient } from './client';
 
 export async function signInWithGoogle() {
   const supabase = createBrowserClient();
+  if (!supabase) {
+    throw new Error('Supabase client not available');
+  }
   
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
@@ -24,6 +27,9 @@ export async function signInWithGoogle() {
 
 export async function signOut() {
   const supabase = createBrowserClient();
+  if (!supabase) {
+    throw new Error('Supabase client not available');
+  }
   
   const { error } = await supabase.auth.signOut();
   
@@ -35,6 +41,9 @@ export async function signOut() {
 
 export async function getSession() {
   const supabase = createBrowserClient();
+  if (!supabase) {
+    return null;
+  }
   
   const { data: { session }, error } = await supabase.auth.getSession();
   
@@ -48,6 +57,9 @@ export async function getSession() {
 
 export async function getUser() {
   const supabase = createBrowserClient();
+  if (!supabase) {
+    return null;
+  }
   
   const { data: { user }, error } = await supabase.auth.getUser();
   
@@ -61,6 +73,10 @@ export async function getUser() {
 
 export function onAuthStateChange(callback: (event: string, session: any) => void) {
   const supabase = createBrowserClient();
+  if (!supabase) {
+    // 빈 구독 반환
+    return { data: { subscription: { unsubscribe: () => {} } } };
+  }
   
   return supabase.auth.onAuthStateChange(callback);
 }

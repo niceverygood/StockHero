@@ -94,7 +94,7 @@ function MyPageContent() {
   }, [user]);
 
   const fetchUserData = async () => {
-    if (!user) return;
+    if (!user || !supabase) return;
     setLoading(true);
 
     try {
@@ -163,7 +163,7 @@ function MyPageContent() {
   };
 
   const savePreferences = async () => {
-    if (!user) return;
+    if (!user || !supabase) return;
 
     try {
       await supabase
@@ -181,7 +181,7 @@ function MyPageContent() {
   };
 
   const removeFromWatchlist = async (id: string) => {
-    if (!user) return;
+    if (!user || !supabase) return;
 
     try {
       await supabase

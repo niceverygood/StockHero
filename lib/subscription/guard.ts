@@ -137,18 +137,20 @@ function createUsageLimitResponse(
  */
 export async function getSubscriptionInfo(request: NextRequest): Promise<SubscriptionInfo | null> {
   try {
+    const supabase = getSupabase();
+    
     // Authorization 헤더에서 토큰 추출
     const authHeader = request.headers.get('Authorization');
     let userId: string | null = null;
 
-    if (authHeader?.startsWith('Bearer ')) {
+    if (supabase && authHeader?.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
       const { data: { user } } = await supabase.auth.getUser(token);
       userId = user?.id || null;
     }
 
     // 쿠키에서 세션 확인
-    if (!userId) {
+    if (!userId && supabase) {
       const cookieHeader = request.headers.get('cookie');
       if (cookieHeader) {
         // Supabase 세션 쿠키 파싱 (간소화)
@@ -169,6 +171,18 @@ export async function getSubscriptionInfo(request: NextRequest): Promise<Subscri
       // 비로그인 사용자 = 무료 플랜
       return {
         userId: 'anonymous',
+        planName: 'free',
+        planId: null,
+        limits: PLAN_LIMITS.free,
+        isActive: true,
+        periodEnd: null,
+      };
+    }
+
+    // supabase가 없으면 무료 플랜 반환
+    if (!supabase) {
+      return {
+        userId,
         planName: 'free',
         planId: null,
         limits: PLAN_LIMITS.free,
@@ -231,6 +245,9 @@ export async function getDailyUsage(
   feature: 'ai_consultations' | 'debates' | 'portfolio_analyses' | 'reports'
 ): Promise<number> {
   if (userId === 'anonymous') return 0;
+  
+  const supabase = getSupabase();
+  if (!supabase) return 0;
 
   const today = new Date().toISOString().split('T')[0];
   
@@ -261,6 +278,9 @@ export async function incrementDailyUsage(
   feature: 'ai_consultations' | 'debates' | 'portfolio_analyses' | 'reports'
 ): Promise<boolean> {
   if (userId === 'anonymous') return false;
+  
+  const supabase = getSupabase();
+  if (!supabase) return false;
 
   const today = new Date().toISOString().split('T')[0];
   const fieldMap: Record<string, string> = {

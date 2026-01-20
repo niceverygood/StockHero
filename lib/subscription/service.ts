@@ -35,6 +35,9 @@ export interface Subscription {
 
 // 사용자 구독 정보 조회
 export async function getUserSubscription(userId: string): Promise<Subscription | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  
   const { data, error } = await supabase
     .from('subscriptions')
     .select('*')
@@ -100,6 +103,9 @@ export async function createOrUpdateSubscription(
     portone_customer_id: customerId || null,
   };
 
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  
   const { data, error } = await supabase
     .from('subscriptions')
     .upsert(subscriptionData, {
@@ -130,6 +136,9 @@ export async function createOrUpdateSubscription(
 
 // 구독 취소
 export async function cancelSubscription(userId: string): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  
   const { error } = await supabase
     .from('subscriptions')
     .update({
@@ -163,6 +172,9 @@ export async function recordPayment(
   portoneTxId: string,
   status: 'paid' | 'failed' = 'paid'
 ): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  
   const { error } = await supabase.from('payments').insert({
     user_id: userId,
     subscription_id: subscriptionId,
@@ -197,6 +209,9 @@ export async function checkFeatureUsage(
   }
 
   // 오늘 사용량 조회
+  const supabase = getSupabase();
+  if (!supabase) return { canUse: true, currentUsage: 0, limit };
+  
   const { data } = await supabase
     .from('feature_usage')
     .select('usage_count')
@@ -219,6 +234,9 @@ export async function incrementFeatureUsage(
   userId: string,
   featureKey: string
 ): Promise<number> {
+  const supabase = getSupabase();
+  if (!supabase) return 1;
+  
   const today = new Date().toISOString().split('T')[0];
 
   const { data, error } = await supabase.rpc('increment_feature_usage', {
@@ -263,6 +281,9 @@ export async function validateCoupon(
   code: string,
   planId: SubscriptionTier
 ): Promise<{ valid: boolean; discountPercent?: number; error?: string }> {
+  const supabase = getSupabase();
+  if (!supabase) return { valid: false, error: '서비스 연결 오류' };
+  
   const { data: coupon, error } = await supabase
     .from('coupons')
     .select('*')
@@ -302,6 +323,9 @@ export async function redeemCoupon(
   userId: string,
   paymentId?: string
 ): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  
   const { data: coupon } = await supabase
     .from('coupons')
     .select('id, current_uses')
@@ -331,6 +355,9 @@ export async function syncSubscriptionStatus(
   userId: string,
   status: 'active' | 'cancelled' | 'expired' | 'past_due'
 ): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  
   const { error } = await supabase
     .from('subscriptions')
     .update({ status })

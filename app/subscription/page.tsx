@@ -32,6 +32,7 @@ export default function SubscriptionPage() {
       try {
         const { createBrowserClient } = await import('@/lib/supabase/client');
         const supabase = createBrowserClient();
+        if (!supabase) return;
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session?.access_token) return;
@@ -105,6 +106,9 @@ export default function SubscriptionPage() {
     try {
       const { createBrowserClient } = await import('@/lib/supabase/client');
       const supabase = createBrowserClient();
+      if (!supabase) {
+        throw new Error('서비스 연결에 실패했습니다.');
+      }
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session?.access_token) {

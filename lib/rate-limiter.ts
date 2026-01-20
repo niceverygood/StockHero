@@ -87,6 +87,9 @@ export async function getUsage(
   userId: string,
   feature: UsageFeature
 ): Promise<number> {
+  const supabase = getSupabase();
+  if (!supabase) return 0;
+  
   const today = getTodayKST();
   const column = FEATURE_TO_COLUMN[feature];
 
@@ -143,6 +146,9 @@ export async function incrementUsage(
   userId: string,
   feature: UsageFeature
 ): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  
   const today = getTodayKST();
   const column = FEATURE_TO_COLUMN[feature];
 
@@ -278,6 +284,9 @@ export async function getUsageStats(
   portfolio_analyses: number;
   reports: number;
 }>> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
 

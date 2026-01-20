@@ -18,7 +18,15 @@ function getSupabase(): SupabaseClient | null {
   _supabase = createClient(url, key);
   return _supabase;
 }
-const supabase = getSupabase();
+
+// 필수로 supabase를 반환하거나 에러 throw
+function requireSupabase(): SupabaseClient {
+  const client = getSupabase();
+  if (!client) {
+    throw new Error('Supabase client not configured');
+  }
+  return client;
+}
 
 // 알림 타입 정의
 export type NotificationType =
@@ -69,6 +77,9 @@ function isPlanSufficient(userPlan: PlanName, requiredPlan: PlanName): boolean {
  * 사용자의 현재 플랜 조회
  */
 export async function getUserPlan(userId: string): Promise<PlanName> {
+  const supabase = getSupabase();
+  if (!supabase) return 'free';
+  
   const { data: subscription } = await supabase
     .from('user_subscriptions')
     .select('plan:subscription_plans(name)')
@@ -99,6 +110,11 @@ export async function createNotification(
     }
 
     // 알림 저장
+    const supabase = getSupabase();
+    if (!supabase) {
+      return { success: false, error: 'Supabase not configured' };
+    }
+    
     const { data, error } = await supabase
       .from('notifications')
       .insert({
@@ -159,6 +175,9 @@ export async function sendNotificationToPlans(
     const planIndex = PLAN_ORDER.indexOf(minPlan);
     const eligiblePlans = PLAN_ORDER.slice(planIndex);
 
+    const supabase = getSupabase();
+    if (!supabase) return { success: 0, failed: 0 };
+    
     const { data: users, error } = await supabase
       .from('user_subscriptions')
       .select('user_id, plan:subscription_plans(name)')
@@ -193,6 +212,9 @@ export async function getNotifications(
 ): Promise<NotificationData[]> {
   const { limit = 20, offset = 0, unreadOnly = false, types } = options;
 
+  const supabase = getSupabase();
+  if (!supabase) return [];
+
   let query = supabase
     .from('notifications')
     .select('*')
@@ -222,6 +244,9 @@ export async function getNotifications(
  * 읽지 않은 알림 개수 조회
  */
 export async function getUnreadCount(userId: string): Promise<number> {
+  const supabase = getSupabase();
+  if (!supabase) return 0;
+  
   const { count, error } = await supabase
     .from('notifications')
     .select('*', { count: 'exact', head: true })
@@ -244,6 +269,9 @@ export async function markAsRead(
   notificationIds?: string[]
 ): Promise<boolean> {
   try {
+    const supabase = getSupabase();
+    if (!supabase) return false;
+    
     let query = supabase
       .from('notifications')
       .update({ is_read: true })
@@ -271,6 +299,9 @@ export async function deleteNotification(
   notificationId: string
 ): Promise<boolean> {
   try {
+    const supabase = getSupabase();
+    if (!supabase) return false;
+    
     const { error } = await supabase
       .from('notifications')
       .delete()
@@ -289,6 +320,9 @@ export async function deleteNotification(
  * 오래된 알림 정리 (30일 이상)
  */
 export async function cleanupOldNotifications(): Promise<number> {
+  const supabase = getSupabase();
+  if (!supabase) return 0;
+  
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -492,6 +526,9 @@ const DEFAULT_PREFERENCES: NotificationPreferences = {
 export async function getNotificationPreferences(
   userId: string
 ): Promise<NotificationPreferences> {
+  const supabase = getSupabase();
+  if (!supabase) return DEFAULT_PREFERENCES;
+  
   const { data, error } = await supabase
     .from('user_preferences')
     .select('notification_settings')
@@ -513,6 +550,9 @@ export async function updateNotificationPreferences(
   preferences: Partial<NotificationPreferences>
 ): Promise<boolean> {
   try {
+    const supabase = getSupabase();
+    if (!supabase) return false;
+    
     const current = await getNotificationPreferences(userId);
     const updated = { ...current, ...preferences };
 

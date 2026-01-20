@@ -214,8 +214,11 @@ export function useCanAccess(feature: FeatureType): {
 } {
   const { checkAccess, isLoading, openUpgradeModal } = useSubscription();
   
-  // 무료 모드에서는 항상 true
-  const canAccess = FREE_MODE ? true : useMemo(() => checkAccess(feature), [checkAccess, feature]);
+  // useMemo는 항상 호출하고, FREE_MODE 체크는 내부에서 처리
+  const canAccess = useMemo(() => {
+    if (FREE_MODE) return true;
+    return checkAccess(feature);
+  }, [checkAccess, feature]);
   
   const openUpgrade = useCallback(() => {
     if (!FREE_MODE) openUpgradeModal(feature);
@@ -235,10 +238,13 @@ export function useUsageLimit(feature: FeatureType): {
 } {
   const { checkUsageLimit, incrementUsage, isLoading, openUpgradeModal } = useSubscription();
   
-  // 무료 모드에서는 무제한
-  const limit = FREE_MODE 
-    ? { allowed: true, limit: 9999, used: 0, remaining: 9999 }
-    : useMemo(() => checkUsageLimit(feature), [checkUsageLimit, feature]);
+  // useMemo는 항상 호출하고, FREE_MODE 체크는 내부에서 처리
+  const limit = useMemo(() => {
+    if (FREE_MODE) {
+      return { allowed: true, limit: 9999, used: 0, remaining: 9999 };
+    }
+    return checkUsageLimit(feature);
+  }, [checkUsageLimit, feature]);
   
   const increment = useCallback(() => {
     if (FREE_MODE) return Promise.resolve(true);
@@ -315,6 +321,11 @@ export function usePlans(): {
   isLoading: boolean;
   error: Error | null;
 } {
+  // useState는 항상 호출 (React Hooks 규칙 준수)
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
   // 무료 모드에서는 빈 배열 반환 (플랜 선택 UI 숨김)
   if (FREE_MODE) {
     return {
@@ -323,10 +334,6 @@ export function usePlans(): {
       error: null,
     };
   }
-
-  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
 
   return { plans, isLoading, error };
 }
