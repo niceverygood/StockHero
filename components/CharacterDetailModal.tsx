@@ -3,47 +3,27 @@
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { CharacterInfo, CHARACTERS, DEBATE_DYNAMICS } from '@/lib/characters';
-import { AIConsultation } from './AIConsultation';
-import type { CharacterType } from '@/lib/llm/types';
-
-interface Holding {
-  name: string;
-  quantity: number;
-  avgPrice: number;
-  currentPrice: number;
-}
 
 interface CharacterDetailModalProps {
   character: CharacterInfo | null;
   isOpen: boolean;
   onClose: () => void;
-  holdings?: Holding[];
-  onViewDebate?: () => void;
 }
 
-export function CharacterDetailModal({ character, isOpen, onClose, holdings = [], onViewDebate }: CharacterDetailModalProps) {
+export function CharacterDetailModal({ character, isOpen, onClose }: CharacterDetailModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
-  const [showConsultation, setShowConsultation] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'worldview' | 'debate'>('profile');
 
   useEffect(() => {
     function handleEscape(e: KeyboardEvent) {
       if (e.key === 'Escape') {
-        if (showConsultation) {
-          setShowConsultation(false);
-        } else {
-          onClose();
-        }
+        onClose();
       }
     }
 
     function handleClickOutside(e: MouseEvent) {
       if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
-        if (showConsultation) {
-          setShowConsultation(false);
-        } else {
-          onClose();
-        }
+        onClose();
       }
     }
 
@@ -58,12 +38,11 @@ export function CharacterDetailModal({ character, isOpen, onClose, holdings = []
       document.removeEventListener('mousedown', handleClickOutside);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, onClose, showConsultation]);
+  }, [isOpen, onClose]);
 
-  // Reset consultation view when modal closes or character changes
+  // Reset tab when modal closes or character changes
   useEffect(() => {
     if (!isOpen) {
-      setShowConsultation(false);
       setActiveTab('profile');
     }
   }, [isOpen, character]);
@@ -80,21 +59,8 @@ export function CharacterDetailModal({ character, isOpen, onClose, holdings = []
         ref={modalRef}
         className="relative w-full max-w-2xl max-h-[90vh] overflow-hidden rounded-2xl bg-dark-900 border border-dark-700 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
       >
-        {showConsultation ? (
-          /* Consultation View */
-          <AIConsultation
-            characterType={character.id as CharacterType}
-            holdings={holdings}
-            onClose={() => setShowConsultation(false)}
-            onViewDebate={() => {
-              setShowConsultation(false);
-              onClose();
-              onViewDebate?.();
-            }}
-          />
-        ) : (
-          /* Character Detail View */
-          <div className="max-h-[90vh] overflow-y-auto">
+        {/* Character Detail View */}
+        <div className="max-h-[90vh] overflow-y-auto">
             {/* Close Button */}
             <button
               onClick={onClose}
@@ -158,27 +124,6 @@ export function CharacterDetailModal({ character, isOpen, onClose, holdings = []
                   <div className="text-xs text-dark-500">경력</div>
                 </div>
               </div>
-            </div>
-
-            {/* Consultation Button */}
-            <div className="px-6 pt-6">
-              <button
-                onClick={() => setShowConsultation(true)}
-                className="w-full py-5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white font-bold text-lg flex items-center justify-center gap-3 hover:scale-[1.02] hover:from-emerald-400 hover:via-teal-400 hover:to-cyan-400 transition-all duration-200 shadow-xl ring-2 ring-emerald-400/30"
-                style={{
-                  boxShadow: `0 8px 32px rgba(16, 185, 129, 0.5), 0 4px 16px rgba(0, 0, 0, 0.3)`
-                }}
-              >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-                💬 {character.nameKo}에게 상담받기
-                {holdings.length > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-white/30 text-sm font-medium">
-                    {holdings.length}종목 연동
-                  </span>
-                )}
-              </button>
             </div>
 
             {/* Tab Navigation */}
@@ -399,7 +344,6 @@ export function CharacterDetailModal({ character, isOpen, onClose, holdings = []
               )}
             </div>
           </div>
-        )}
       </div>
     </div>
   );
