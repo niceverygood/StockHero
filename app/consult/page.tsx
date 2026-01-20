@@ -28,6 +28,31 @@ interface Message {
 // 단계 타입
 type Step = 1 | 2 | 3;
 
+// AI별 추천 질문
+const SUGGESTED_QUESTIONS: Record<CharacterType, string[]> = {
+  claude: [
+    '현재 적정 주가는 얼마인가요?',
+    'PER, PBR 기준으로 고평가인가요?',
+    '동종업계 대비 어떤가요?',
+    '분할 매수 전략을 추천해주세요',
+    '리스크 요인은 뭔가요?',
+  ],
+  gemini: [
+    '성장 가능성이 얼마나 될까요?',
+    '이 섹터의 미래 전망은 어떤가요?',
+    '경쟁사 대비 강점이 뭔가요?',
+    '언제 매수하면 좋을까요?',
+    '목표 수익률은 어느 정도가 좋을까요?',
+  ],
+  gpt: [
+    '지금 진입해도 괜찮을까요?',
+    '거시경제가 이 종목에 미치는 영향은?',
+    '포트폴리오 비중은 얼마가 적당할까요?',
+    '손절가와 목표가를 알려주세요',
+    '장기 투자해도 될까요?',
+  ],
+};
+
 export default function ConsultPage() {
   // 현재 단계 (1: 전문가 선택, 2: 종목 선택, 3: 상담)
   const [currentStep, setCurrentStep] = useState<Step>(1);
@@ -100,35 +125,69 @@ export default function ConsultPage() {
     setLoading(true);
 
     try {
+      // 먼저 실시간 가격 조회
+      let stockPrice = null;
+      try {
+        const priceRes = await fetch(`/api/stocks/price?symbol=${stock.symbol}`);
+        const priceData = await priceRes.json();
+        if (priceData.success && priceData.data) {
+          stockPrice = {
+            symbol: stock.symbol,
+            name: stock.name,
+            currentPrice: priceData.data.price,
+            change: priceData.data.change,
+            changePercent: priceData.data.changePercent,
+          };
+        }
+      } catch (e) {
+        console.log('Price fetch failed, continuing without price');
+      }
+
+      // AI 초기 분석 요청
       const res = await fetch('/api/consultation/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          character: selectedAI,
-          stock: { symbol: stock.symbol, name: stock.name },
-          messages: [],
-          isInitial: true,
+          characterType: selectedAI,
+          messages: [{ role: 'user', content: `${stock.name}(${stock.symbol}) 종목에 대해 분석해주세요.` }],
+          stockData: stockPrice,
+          isInitialAnalysis: true,
         }),
       });
 
       const data = await res.json();
-      if (data.success && data.response) {
+      if (data.success && data.data?.content) {
         setMessages([{
           role: 'assistant',
-          content: data.response,
+          content: data.data.content,
+          character: selectedAI,
+        }]);
+      } else {
+        // API 실패 시 기본 메시지
+        const charName = CHARACTERS[selectedAI].nameKo;
+        setMessages([{
+          role: 'assistant',
+          content: `안녕하세요! ${charName}입니다. ${stock.name}(${stock.symbol})에 대해 상담을 시작합니다.\n\n어떤 부분이 궁금하신가요? 매수/매도 의견, 적정 주가, 리스크 분석 등 다양한 질문을 해주세요!`,
           character: selectedAI,
         }]);
       }
     } catch (error) {
       console.error('Failed to start consultation:', error);
+      const charName = CHARACTERS[selectedAI].nameKo;
       setMessages([{
         role: 'assistant',
-        content: `안녕하세요! ${stock.name}(${stock.symbol})에 대해 궁금한 점을 물어보세요.`,
+        content: `안녕하세요! ${charName}입니다. ${stock.name}(${stock.symbol})에 대해 궁금한 점을 물어보세요.`,
         character: selectedAI,
       }]);
     } finally {
       setLoading(false);
     }
+  };
+
+  // 추천 질문 클릭 핸들러
+  const handleSuggestedQuestion = (question: string) => {
+    if (!selectedStock) return;
+    setInput(`${selectedStock.name}의 ${question.replace('?', '')}에 대해 알려주세요`);
   };
 
   const sendMessage = async () => {
@@ -593,6 +652,30 @@ export default function ConsultPage() {
                         feature="ai_consultations"
                         variant="compact"
                       />
+                    </div>
+                  )}
+
+                  {/* 추천 질문 */}
+                  {selectedAI && !loading && messages.length > 0 && messages.length < 5 && (
+                    <div className="px-4 pt-3">
+                      <p className="text-xs text-dark-500 mb-2 flex items-center gap-1">
+                        <SparklesIcon className="w-3 h-3" />
+                        추천 질문
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {SUGGESTED_QUESTIONS[selectedAI].slice(0, 4).map((q, i) => (
+                          <button
+                            key={i}
+                            onClick={() => handleSuggestedQuestion(q)}
+                            className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+                              char ? `${char.bgColor} ${char.color} border ${char.borderColor} hover:opacity-80` 
+                                   : 'bg-dark-800 text-dark-300 border border-dark-700 hover:bg-dark-700'
+                            }`}
+                          >
+                            {q}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
                   
