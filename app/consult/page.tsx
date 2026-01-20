@@ -658,16 +658,27 @@ export default function ConsultPage() {
                   {/* 추천 질문 */}
                   {selectedAI && !loading && messages.length > 0 && messages.length < 5 && (
                     <div className="px-4 pt-3">
-                      <p className="text-xs text-dark-500 mb-2 flex items-center gap-1">
-                        <SparklesIcon className="w-3 h-3" />
-                        추천 질문
-                      </p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-6 h-6 rounded-full overflow-hidden ring-1 ring-dark-600">
+                          <Image
+                            src={char?.image || ''}
+                            alt={char?.name || ''}
+                            width={24}
+                            height={24}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <p className="text-xs text-dark-400 flex items-center gap-1">
+                          <SparklesIcon className="w-3 h-3" />
+                          <span className={char?.color}>{char?.nameKo}</span>에게 물어보세요
+                        </p>
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         {SUGGESTED_QUESTIONS[selectedAI].slice(0, 4).map((q, i) => (
                           <button
                             key={i}
                             onClick={() => handleSuggestedQuestion(q)}
-                            className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+                            className={`px-3 py-1.5 text-xs rounded-full transition-all flex items-center gap-1.5 ${
                               char ? `${char.bgColor} ${char.color} border ${char.borderColor} hover:opacity-80` 
                                    : 'bg-dark-800 text-dark-300 border border-dark-700 hover:bg-dark-700'
                             }`}
