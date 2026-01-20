@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { Header } from '@/components';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useCurrentPlan } from '@/lib/subscription';
@@ -22,6 +22,34 @@ import {
 } from 'lucide-react';
 import { SignalFeed } from '@/components/vip/SignalFeed';
 import { ExclusiveStockCard } from '@/components/vip/ExclusiveStockCard';
+
+// Suspense fallback component
+function VIPPageLoading() {
+  return (
+    <>
+      <Header />
+      <main className="min-h-screen bg-dark-950 pt-24 pb-12">
+        <div className="container-app">
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="text-center">
+              <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-dark-400">VIP 페이지 로딩 중...</p>
+            </div>
+          </div>
+        </div>
+      </main>
+    </>
+  );
+}
+
+// Wrapper component with Suspense
+export default function VIPPageWrapper() {
+  return (
+    <Suspense fallback={<VIPPageLoading />}>
+      <VIPPage />
+    </Suspense>
+  );
+}
 
 interface VIPStock {
   rank: number;
@@ -88,7 +116,7 @@ interface BacktestSummary {
   };
 }
 
-export default function VIPPage() {
+function VIPPage() {
   const { user, loading: authLoading } = useAuth();
   const { plan: currentPlan, planName, isVip, isLoading: planLoading } = useCurrentPlan();
   const router = useRouter();
