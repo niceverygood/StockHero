@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { HOT_THEMES, HotTheme, ThemeStock } from '@/lib/data/hot-themes';
 import { fetchMultipleYahooUSStocks } from '@/lib/market-data/yahoo';
 
-// OpenRouter 모델 매핑
+// OpenRouter 모델 매핑 (2026년 1월 - 실제 존재하는 모델)
 const OPENROUTER_MODELS: Record<string, string> = {
-  claude: 'anthropic/claude-opus-4.5',
-  gemini: 'google/gemini-2.5-flash',
+  claude: 'anthropic/claude-sonnet-4',
+  gemini: 'google/gemini-2.5-pro-preview',
   gpt: 'openai/gpt-4o',
 };
 

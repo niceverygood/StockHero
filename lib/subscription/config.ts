@@ -210,3 +210,24 @@ export const formatPrice = (price: number): string => {
   return `₩${price.toLocaleString()}`;
 };
 
+// 주문 ID 생성
+export const generateOrderId = (userId: string, planId: string): string => {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 8);
+  return `ORDER_${planId.toUpperCase()}_${timestamp}_${random}`;
+};
+
+// 결제 금액 계산
+export const calculatePaymentAmount = (
+  planId: SubscriptionTier,
+  billingCycle: 'monthly' | 'yearly',
+  discountPercent: number = 0
+): number => {
+  const plan = SUBSCRIPTION_PLANS.find(p => p.id === planId);
+  if (!plan) return 0;
+
+  const baseAmount = billingCycle === 'monthly' ? plan.monthlyPrice : plan.yearlyPrice;
+  const discount = Math.floor(baseAmount * (discountPercent / 100));
+  
+  return baseAmount - discount;
+};

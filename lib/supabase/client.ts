@@ -1,29 +1,41 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-// Client-side Supabase client (uses anon key)
-// Only create if environment variables are available
-let supabase: SupabaseClient;
-
-if (supabaseUrl && supabaseAnonKey) {
-  supabase = createClient(supabaseUrl, supabaseAnonKey);
-} else {
-  // Create a dummy client for build time - will be replaced at runtime
-  console.warn('Supabase environment variables not found. Using placeholder.');
-  supabase = createClient('https://placeholder.supabase.co', 'placeholder-key');
+// 클라이언트 사이드에서만 환경변수를 읽음
+function getSupabaseConfig() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  
+  if (!url || !key) {
+    return null;
+  }
+  return { url, key };
 }
 
-export { supabase };
+// Singleton 클라이언트 인스턴스
+let supabaseInstance: SupabaseClient | null = null;
+
+// Client-side Supabase client (uses anon key)
+export function getSupabaseClient(): SupabaseClient | null {
+  if (supabaseInstance) {
+    return supabaseInstance;
+  }
+
+  const config = getSupabaseConfig();
+  if (!config) {
+    console.warn('Supabase environment variables not configured');
+    return null;
+  }
+
+  supabaseInstance = createClient(config.url, config.key);
+  return supabaseInstance;
+}
+
+// 레거시 호환성을 위한 export (null일 수 있음)
+export const supabase = getSupabaseClient();
 
 // For browser usage
-export function createBrowserClient() {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn('Supabase environment variables not configured');
-    return createClient('https://placeholder.supabase.co', 'placeholder-key');
-  }
-  return createClient(supabaseUrl, supabaseAnonKey);
+export function createBrowserClient(): SupabaseClient | null {
+  return getSupabaseClient();
 }
 
 

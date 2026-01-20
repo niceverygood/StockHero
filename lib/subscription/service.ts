@@ -1,13 +1,22 @@
 // 구독 서비스 - 비즈니스 로직
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { SubscriptionTier, FEATURE_LIMITS, getFeatureLimit } from './config';
 
-// Supabase 클라이언트 (서버용)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy initialization
+let _supabase: SupabaseClient | null = null;
+function getSupabase(): SupabaseClient | null {
+  if (_supabase) return _supabase;
+  
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!url || !key) return null;
+  
+  _supabase = createClient(url, key);
+  return _supabase;
+}
+const supabase = getSupabase();
 
 // 구독 정보 타입
 export interface Subscription {

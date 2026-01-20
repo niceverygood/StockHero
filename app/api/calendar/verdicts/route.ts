@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Disable caching for this API route
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// Enable caching for calendar data (revalidate every 5 minutes)
+export const revalidate = 300;
 
-// Supabase Client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Supabase Client (singleton pattern)
+let supabaseInstance: ReturnType<typeof createClient> | null = null;
+
+function getSupabase() {
+  if (!supabaseInstance) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) {
+      throw new Error('Supabase credentials not configured');
+    }
+    supabaseInstance = createClient(url, key);
+  }
+  return supabaseInstance;
+}
 
 // 종목명 매핑 (실시간 가격 조회용) - 확장된 종목 목록
 const STOCK_NAMES: Record<string, { name: string; sector: string }> = {
@@ -129,9 +137,11 @@ export async function GET(request: NextRequest) {
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
 
+    // 필요한 필드만 최소한으로 선택 (성능 최적화)
+    const supabase = getSupabase();
     const { data: dbVerdicts, error } = await supabase
       .from('verdicts')
-      .select('date, top5, claude_top5, gemini_top5, gpt_top5, consensus_summary')
+      .select('date, top5')
       .gte('date', startDate)
       .lte('date', endDate)
       .order('date', { ascending: true });
@@ -161,12 +171,11 @@ export async function GET(request: NextRequest) {
       6: { name: '히든 젬', emoji: '🌟' },
     };
 
-    // Convert to calendar format with theme info
+    // Convert to calendar format with theme info (최소 데이터만 반환)
     const calendarVerdicts = verdicts.map(v => {
       const dateObj = new Date(v.date);
       const dayOfWeek = dateObj.getDay();
       const theme = DAY_THEMES[dayOfWeek];
-      const dbVerdict = dbVerdicts?.find((d: any) => d.date === v.date);
       
       return {
         date: v.date,
@@ -181,22 +190,21 @@ export async function GET(request: NextRequest) {
           geminiScore: item.geminiScore,
           gptScore: item.gptScore,
           currentPrice: item.currentPrice || 0,
-          change: item.change || 0,
-          changePercent: item.changePercent || 0,
         })),
-        // 각 AI별 개별 Top 5
-        claudeTop5: dbVerdict?.claude_top5 || [],
-        geminiTop5: dbVerdict?.gemini_top5 || [],
-        gptTop5: dbVerdict?.gpt_top5 || [],
-        consensusSummary: dbVerdict?.consensus_summary,
+        consensusSummary: '',
       };
     });
 
+    // 캐싱 헤더 추가 (5분)
     return NextResponse.json({
       success: true,
       verdicts: calendarVerdicts,
       dbCount: verdicts.length,
       todayHasData: verdicts.some(v => v.date === todayStr),
+    }, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+      },
     });
   } catch (error) {
     console.error('Calendar verdicts error:', error);

@@ -22,6 +22,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const supabase = createBrowserClient();
 
+    // Supabase 클라이언트가 없으면 로딩만 false로 설정
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -45,6 +51,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async () => {
     const supabase = createBrowserClient();
+    if (!supabase) {
+      console.error('Supabase client not available');
+      return;
+    }
     
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -65,6 +75,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     const supabase = createBrowserClient();
+    if (!supabase) {
+      console.error('Supabase client not available');
+      return;
+    }
     
     const { error } = await supabase.auth.signOut();
     

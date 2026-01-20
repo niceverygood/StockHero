@@ -35,11 +35,11 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' })
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '');
 
 // OpenRouter 모델 매핑
-// OpenRouter 최신 모델 (2024년 12월)
+// OpenRouter 최신 모델 (2026년 1월) - 실제 존재하는 모델
 const OPENROUTER_MODELS: Record<string, string> = {
-  claude: 'anthropic/claude-opus-4.5',           // Claude Opus 4.5 (최신)
-  gemini: 'google/gemini-3-flash-preview',       // Gemini 3 Flash (최신)
-  gpt: 'openai/gpt-5.2',                         // GPT-5.2 (최신)
+  claude: 'anthropic/claude-sonnet-4',           // Claude Sonnet 4 (최신)
+  gemini: 'google/gemini-2.5-pro-preview',       // Gemini 2.5 Pro (최신)
+  gpt: 'openai/gpt-4o',                          // GPT-4o (최신)
 };
 
 // 분석 대상 종목 목록 (대형주 + 중소형주 + 테마주 다양화)
@@ -620,7 +620,7 @@ export async function GET(
   });
   
   // 5. 구독 기반 데이터 필터링
-  let filteredStocks = stocksWithPrices;
+  let filteredStocks: any[] = stocksWithPrices;
 
   // 무료 플랜: 3~5위만 공개
   if (planName === 'free') {
@@ -633,8 +633,8 @@ export async function GET(
           name: '🔒 프리미엄 전용',
           symbol: '******',
           reason: '상위 종목을 확인하려면 베이직 플랜 이상이 필요합니다.',
-          targetPrice: null,
-          expectedReturn: null,
+          targetPrice: 0,
+          expectedReturn: '잠금',
           risks: [],
           isLocked: true,
         };
@@ -642,8 +642,8 @@ export async function GET(
       // 3~5위는 공개하되 목표가 제외
       return {
         ...stock,
-        targetPrice: null,
-        expectedReturn: null,
+        targetPrice: 0,
+        expectedReturn: '베이직 이상',
       };
     });
   }
@@ -652,7 +652,7 @@ export async function GET(
   if (planName === 'basic') {
     filteredStocks = stocksWithPrices.map(stock => ({
       ...stock,
-      targetDate: null, // 목표달성일 제외
+      targetDate: undefined, // 목표달성일 제외
     }));
   }
 

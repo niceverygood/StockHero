@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Header } from '@/components';
 
 interface Top5Item {
@@ -12,8 +12,8 @@ interface Top5Item {
   geminiScore: number;
   gptScore: number;
   isUnanimous: boolean;
-  price?: number; // 추천 당시 가격
-  currentPrice?: number; // 추천 당시 현재가 (DB에서 저장된 이름)
+  price?: number;
+  currentPrice?: number;
 }
 
 interface DayVerdict {
@@ -42,6 +42,10 @@ interface PriceData {
 }
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+
+// 캐시 (메모리 기반)
+const verdictCache = new Map<string, { data: Record<string, DayVerdict>; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5분
 
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -92,7 +96,17 @@ export default function CalendarPage() {
     }
   };
 
-  const fetchMonthVerdicts = async () => {
+  const fetchMonthVerdicts = useCallback(async () => {
+    const cacheKey = `${year}-${month + 1}`;
+    const cached = verdictCache.get(cacheKey);
+    
+    // 캐시가 유효하면 캐시 사용
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      setVerdicts(cached.data);
+      setLoading(false);
+      return;
+    }
+    
     try {
       setLoading(true);
       const res = await fetch(`/api/calendar/verdicts?year=${year}&month=${month + 1}`);
@@ -104,13 +118,16 @@ export default function CalendarPage() {
           verdictMap[v.date] = v;
         });
         setVerdicts(verdictMap);
+        
+        // 캐시 저장
+        verdictCache.set(cacheKey, { data: verdictMap, timestamp: Date.now() });
       }
     } catch (error) {
       console.error('Failed to fetch verdicts:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [year, month]);
 
   // 종목별 추천 이력 분석
   const stockHistories = useMemo(() => {

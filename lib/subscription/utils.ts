@@ -122,27 +122,27 @@ export function checkFeatureAccess(userPlan: string, feature: FeatureType): bool
   
   switch (feature) {
     case 'ai_consultations':
-      return features.dailyConsultationLimit !== 0;
+      return (features.dailyConsultationLimit as number) !== 0;
     case 'debates':
-      return features.showRealTimeDebate || features.dailyDebateLimit > 0;
+      return !!(features.showRealTimeDebate) || (features.dailyDebateLimit as number) > 0;
     case 'reports':
-      return features.reportDownload !== 0;
+      return (features.reportDownload as number) !== 0;
     case 'portfolio_analyses':
-      return features.dailyPortfolioAnalysis !== 0;
+      return (features.dailyPortfolioAnalysis as number) !== 0;
     case 'backtest':
-      return features.backtestDays > 0;
+      return (features.backtestDays as number) > 0;
     case 'realtime_alerts':
-      return features.alertsPerDay !== 0;
+      return (features.alertsPerDay as number) !== 0;
     case 'vip_stocks':
-      return features.hasVipStocks;
+      return !!(features.hasVipStocks);
     case 'realtime_signal':
-      return features.hasRealTimeSignal;
+      return !!(features.hasRealTimeSignal);
     case 'target_price':
-      return features.showTargetPrice;
+      return !!(features.showTargetPrice);
     case 'target_date':
-      return features.showTargetDate;
+      return !!(features.showTargetDate);
     case 'full_top5':
-      return features.top5VisibleCount === 5;
+      return (features.top5VisibleCount as number) === 5;
     default:
       return false;
   }
@@ -169,16 +169,16 @@ export function checkUsageLimitByPlan(
   
   switch (feature) {
     case 'ai_consultations':
-      limit = features.dailyConsultationLimit;
+      limit = features.dailyConsultationLimit as number;
       break;
     case 'debates':
-      limit = features.dailyDebateLimit;
+      limit = features.dailyDebateLimit as number;
       break;
     case 'reports':
-      limit = features.reportDownload;
+      limit = features.reportDownload as number;
       break;
     case 'portfolio_analyses':
-      limit = features.dailyPortfolioAnalysis;
+      limit = features.dailyPortfolioAnalysis as number;
       break;
     default:
       limit = 0;

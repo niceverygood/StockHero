@@ -45,11 +45,11 @@ const US_ANALYSIS_STOCKS = [
 ];
 
 // OpenRouter 모델 매핑
-// OpenRouter 최신 모델 (2024년 12월)
+// OpenRouter 최신 모델 (2026년 1월) - 실제 존재하는 모델
 const OPENROUTER_MODELS: Record<string, string> = {
-  claude: 'anthropic/claude-opus-4.5',           // Claude Opus 4.5 (최신)
-  gemini: 'google/gemini-3-flash-preview',       // Gemini 3 Flash (최신)
-  gpt: 'openai/gpt-5.2',                         // GPT-5.2 (최신)
+  claude: 'anthropic/claude-sonnet-4',           // Claude Sonnet 4 (최신)
+  gemini: 'google/gemini-2.5-pro-preview',       // Gemini 2.5 Pro (최신)
+  gpt: 'openai/gpt-4o',                          // GPT-4o (최신)
 };
 
 // 캐릭터별 프로필

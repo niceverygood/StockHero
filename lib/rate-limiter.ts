@@ -2,13 +2,26 @@
 // 플랜별 레이트 리밋 관리
 // =====================================================
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { PLAN_FEATURES, PLAN_DISPLAY_NAMES } from './subscription/utils';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy initialization - 서버 사이드에서만 사용
+let _supabase: SupabaseClient | null = null;
+function getSupabase(): SupabaseClient | null {
+  if (_supabase) return _supabase;
+  
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!url || !key) {
+    console.warn('Supabase credentials not available for rate-limiter');
+    return null;
+  }
+  
+  _supabase = createClient(url, key);
+  return _supabase;
+}
+const supabase = getSupabase();
 
 // 기능별 사용량 타입
 export type UsageFeature = 
@@ -30,10 +43,10 @@ export interface RateLimitResult {
 
 // 플랜별 기능 제한 매핑
 const PLAN_LIMIT_MAP: Record<UsageFeature, (plan: string) => number> = {
-  ai_consultations: (plan) => PLAN_FEATURES[plan]?.dailyConsultationLimit ?? 3,
-  debates: (plan) => PLAN_FEATURES[plan]?.dailyDebateLimit ?? 1,
-  portfolio_analyses: (plan) => PLAN_FEATURES[plan]?.dailyPortfolioAnalysis ?? 1,
-  reports: (plan) => PLAN_FEATURES[plan]?.reportDownload ?? 0,
+  ai_consultations: (plan) => (PLAN_FEATURES[plan]?.dailyConsultationLimit as number) ?? 3,
+  debates: (plan) => (PLAN_FEATURES[plan]?.dailyDebateLimit as number) ?? 1,
+  portfolio_analyses: (plan) => (PLAN_FEATURES[plan]?.dailyPortfolioAnalysis as number) ?? 1,
+  reports: (plan) => (PLAN_FEATURES[plan]?.reportDownload as number) ?? 0,
   backtest: () => -1, // 백테스트는 횟수 제한 없음 (기간만 제한)
 };
 
@@ -142,12 +155,12 @@ export async function incrementUsage(
       .eq('date', today)
       .single();
 
-    if (existing) {
+    if (existing && 'id' in existing) {
       // 기존 레코드 업데이트
       const { error } = await supabase
         .from('subscription_usage')
         .update({ [column]: ((existing as any)[column] || 0) + 1 })
-        .eq('id', existing.id);
+        .eq('id', (existing as any).id);
 
       return !error;
     } else {

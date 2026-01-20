@@ -140,7 +140,7 @@ async function sendRealtimePriceAlerts(): Promise<{ surges: number; drops: numbe
     );
 
     // 각 종목 가격 확인
-    for (const [symbol, stock] of stockMap) {
+    for (const [symbol, stock] of Array.from(stockMap.entries())) {
       // 30분 내 이미 알림 발송한 종목 스킵
       if (recentAlertedSymbols.has(symbol)) continue;
 

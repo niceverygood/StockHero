@@ -340,13 +340,13 @@ export default function PricingPage() {
                           </span>
                         </li>
                         <li className="flex items-center gap-2 text-sm">
-                          {features.backtestDays > 0 ? (
+                          {(features.backtestDays as number) > 0 ? (
                             <span className={theme.highlight}>✓</span>
                           ) : (
                             <span className="text-dark-600">✗</span>
                           )}
-                          <span className={features.backtestDays > 0 ? 'text-dark-300' : 'text-dark-500'}>
-                            백테스트 {features.backtestDays > 0 ? `${features.backtestDays}일` : ''}
+                          <span className={(features.backtestDays as number) > 0 ? 'text-dark-300' : 'text-dark-500'}>
+                            백테스트 {(features.backtestDays as number) > 0 ? `${features.backtestDays}일` : ''}
                           </span>
                         </li>
                         <li className="flex items-center gap-2 text-sm">

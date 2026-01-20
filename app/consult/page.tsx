@@ -1,20 +1,15 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
 import { Header } from '@/components';
 import { CHARACTERS } from '@/lib/characters';
+import { CharacterDetailModal } from '@/components/CharacterDetailModal';
 import { KRX_ALL_STOCKS, searchStocksByName, type KRXStock } from '@/lib/data/krx-stocks';
 import { useCurrentPlan, useUsageLimit, useSubscription } from '@/lib/subscription/hooks';
 import { UsageLimitWarning, UpgradePrompt } from '@/components/subscription';
-import { LockIcon, AlertCircleIcon } from 'lucide-react';
-
-type CharacterType = 'claude' | 'gemini' | 'gpt';
-
-const AI_EMOJIS: Record<CharacterType, string> = {
-  claude: '🔵',
-  gemini: '🟣',
-  gpt: '🟡',
-};
+import { LockIcon, AlertCircleIcon, InfoIcon, SparklesIcon } from 'lucide-react';
+import type { CharacterType } from '@/lib/llm/types';
 
 // 플랜별 응답 길이 제한
 const RESPONSE_LIMITS: Record<string, number> = {
@@ -39,12 +34,13 @@ export default function ConsultPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showCharacterModal, setShowCharacterModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   
   // 구독 정보
   const { planName, isPremium, isVip, isLoading: planLoading } = useCurrentPlan();
-  const { limit: consultationLimit, increment: useConsultation, openUpgrade } = useUsageLimit('ai_consultations');
+  const { limit: consultationLimit, increment: incrementConsultation, openUpgrade } = useUsageLimit('ai_consultations');
   const { openUpgradeModal } = useSubscription();
   
   // 상담 제한 여부
@@ -135,7 +131,7 @@ export default function ConsultPage() {
 
     try {
       // 사용량 증가
-      const canProceed = await useConsultation();
+      const canProceed = await incrementConsultation();
       if (!canProceed) {
         setLoading(false);
         return;
@@ -196,8 +192,8 @@ export default function ConsultPage() {
             </p>
           </div>
 
-          {/* AI Selector */}
-          <div className="flex justify-center gap-3 mb-8">
+          {/* AI Selector with Character Images */}
+          <div className="flex justify-center gap-4 mb-8">
             {(['claude', 'gemini', 'gpt'] as const).map((charId) => {
               const c = CHARACTERS[charId];
               const isSelected = selectedAI === charId;
@@ -208,19 +204,119 @@ export default function ConsultPage() {
                     setSelectedAI(charId);
                     resetConsultation();
                   }}
-                  className={`flex items-center gap-2 px-4 py-3 rounded-xl transition-all ${
+                  className={`relative flex items-center gap-3 px-4 py-3 rounded-2xl transition-all ${
                     isSelected
-                      ? `${c.bgColor} border-2 border-current`
-                      : 'bg-dark-900/80 border border-dark-800 hover:border-dark-700'
+                      ? `bg-gradient-to-br ${c.gradient} shadow-lg scale-105`
+                      : 'bg-dark-900/80 border border-dark-800 hover:border-dark-600 hover:scale-102'
                   }`}
                 >
-                  <span className="text-2xl">{AI_EMOJIS[charId]}</span>
-                  <span className={`font-medium ${isSelected ? c.color : 'text-dark-300'}`}>
-                    {c.name}
-                  </span>
+                  {/* Character Avatar */}
+                  <div className={`w-12 h-12 rounded-xl overflow-hidden ${isSelected ? 'ring-2 ring-white/30' : 'ring-1 ring-dark-700'}`}>
+                    <Image
+                      src={c.image}
+                      alt={c.name}
+                      width={48}
+                      height={48}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="text-left">
+                    <p className={`font-bold ${isSelected ? 'text-white' : 'text-dark-200'}`}>
+                      {c.nameKo}
+                    </p>
+                    <p className={`text-xs ${isSelected ? 'text-white/70' : 'text-dark-500'}`}>
+                      {c.roleKo}
+                    </p>
+                  </div>
+                  
+                  {/* Selected indicator */}
+                  {isSelected && (
+                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-white rounded-full flex items-center justify-center">
+                      <svg className="w-3 h-3 text-dark-900" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  )}
                 </button>
               );
             })}
+          </div>
+
+          {/* Selected Character Info Card */}
+          <div className="max-w-3xl mx-auto mb-8">
+            <div className={`relative overflow-hidden rounded-2xl border ${char.borderColor} ${char.bgColor}`}>
+              <div className="p-5 flex items-start gap-4">
+                {/* Large Avatar */}
+                <button
+                  onClick={() => setShowCharacterModal(true)}
+                  className="relative flex-shrink-0 group"
+                >
+                  <div className={`w-20 h-20 rounded-2xl overflow-hidden ring-2 ${char.borderColor} group-hover:ring-4 transition-all`}>
+                    <Image
+                      src={char.image}
+                      alt={char.name}
+                      width={80}
+                      height={80}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  {/* Hover overlay */}
+                  <div className="absolute inset-0 bg-dark-950/60 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <InfoIcon className="w-5 h-5 text-white" />
+                  </div>
+                </button>
+
+                {/* Character Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className={`text-lg font-bold ${char.color}`}>{char.name}</h3>
+                    <span className="text-dark-500">|</span>
+                    <span className="text-dark-300 text-sm">{char.nameKo}</span>
+                    <button
+                      onClick={() => setShowCharacterModal(true)}
+                      className="ml-auto px-2 py-1 text-xs text-dark-400 hover:text-dark-200 bg-dark-800/50 hover:bg-dark-800 rounded-lg transition-colors flex items-center gap-1"
+                    >
+                      <SparklesIcon className="w-3 h-3" />
+                      세계관
+                    </button>
+                  </div>
+                  <p className="text-dark-400 text-sm mb-2">{char.roleKo}</p>
+                  
+                  {/* Catchphrase */}
+                  <p className="text-dark-300 text-sm italic border-l-2 border-current pl-3">
+                    {char.catchphrase}
+                  </p>
+                  
+                  {/* Tags */}
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {char.tags.map((tag, i) => (
+                      <span
+                        key={i}
+                        className={`px-2 py-0.5 text-xs rounded-full ${char.bgColor} border ${char.borderColor} ${char.color}`}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Stats Bar */}
+              <div className="grid grid-cols-3 border-t border-dark-800/50">
+                <div className="py-2 px-4 text-center border-r border-dark-800/50">
+                  <p className={`text-lg font-bold ${char.color}`}>{char.accuracy}%</p>
+                  <p className="text-xs text-dark-500">적중률</p>
+                </div>
+                <div className="py-2 px-4 text-center border-r border-dark-800/50">
+                  <p className={`text-lg font-bold ${char.color}`}>{char.totalAnalyses.toLocaleString()}</p>
+                  <p className="text-xs text-dark-500">총 분석</p>
+                </div>
+                <div className="py-2 px-4 text-center">
+                  <p className={`text-lg font-bold ${char.color}`}>{char.experience.split(' ')[0]}</p>
+                  <p className="text-xs text-dark-500">경력</p>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="max-w-3xl mx-auto">
@@ -298,22 +394,37 @@ export default function ConsultPage() {
             {selectedStock && (
               <div className="bg-dark-900/80 border border-dark-800 rounded-2xl overflow-hidden">
                 {/* Chat Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-dark-800">
+                <div className={`flex items-center justify-between px-5 py-4 border-b border-dark-800 bg-gradient-to-r ${char.gradient} bg-opacity-10`}>
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl ${char.bgColor} flex items-center justify-center`}>
-                      <span className="text-xl">{AI_EMOJIS[selectedAI]}</span>
+                    <div className="w-12 h-12 rounded-xl overflow-hidden ring-2 ring-white/20">
+                      <Image
+                        src={char.image}
+                        alt={char.name}
+                        width={48}
+                        height={48}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                     <div>
-                      <p className="font-medium text-dark-100">{char.name}</p>
-                      <p className="text-xs text-dark-500">{selectedStock.name} ({selectedStock.symbol}) 상담 중</p>
+                      <p className="font-bold text-white">{char.nameKo}</p>
+                      <p className="text-xs text-white/70">{selectedStock.name} ({selectedStock.symbol}) 상담 중</p>
                     </div>
                   </div>
-                  <button
-                    onClick={resetConsultation}
-                    className="px-3 py-1.5 text-sm text-dark-400 hover:text-dark-200 hover:bg-dark-800 rounded-lg transition-all"
-                  >
-                    종료
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowCharacterModal(true)}
+                      className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+                      title="세계관 보기"
+                    >
+                      <InfoIcon className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={resetConsultation}
+                      className="px-3 py-1.5 text-sm text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+                    >
+                      종료
+                    </button>
+                  </div>
                 </div>
 
                 {/* Messages */}
@@ -323,11 +434,22 @@ export default function ConsultPage() {
                       key={i}
                       className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
+                      {msg.role === 'assistant' && (
+                        <div className="flex-shrink-0 w-8 h-8 rounded-lg overflow-hidden mr-2 ring-1 ring-dark-700">
+                          <Image
+                            src={char.image}
+                            alt={char.name}
+                            width={32}
+                            height={32}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
                       <div
-                        className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                        className={`max-w-[75%] rounded-2xl px-4 py-3 ${
                           msg.role === 'user'
                             ? 'bg-brand-500/20 text-dark-100'
-                            : 'bg-dark-800/50 text-dark-200'
+                            : `${char.bgColor} border ${char.borderColor} text-dark-200`
                         }`}
                       >
                         <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
@@ -336,11 +458,20 @@ export default function ConsultPage() {
                   ))}
                   {loading && (
                     <div className="flex justify-start">
-                      <div className="bg-dark-800/50 rounded-2xl px-4 py-3">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-lg overflow-hidden mr-2 ring-1 ring-dark-700">
+                        <Image
+                          src={char.image}
+                          alt={char.name}
+                          width={32}
+                          height={32}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className={`${char.bgColor} border ${char.borderColor} rounded-2xl px-4 py-3`}>
                         <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-dark-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <div className="w-2 h-2 bg-dark-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <div className="w-2 h-2 bg-dark-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                          <div className={`w-2 h-2 ${char.color.replace('text-', 'bg-')} rounded-full animate-bounce`} style={{ animationDelay: '0ms' }} />
+                          <div className={`w-2 h-2 ${char.color.replace('text-', 'bg-')} rounded-full animate-bounce`} style={{ animationDelay: '150ms' }} />
+                          <div className={`w-2 h-2 ${char.color.replace('text-', 'bg-')} rounded-full animate-bounce`} style={{ animationDelay: '300ms' }} />
                         </div>
                       </div>
                     </div>
@@ -397,9 +528,32 @@ export default function ConsultPage() {
             )}
           </div>
           
+          {/* VIP 성과 티저 */}
+          {!isPremium && !planLoading && (
+            <div className="max-w-3xl mx-auto mt-6">
+              <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-xl p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">🏆</span>
+                    <div>
+                      <p className="text-amber-400 font-medium">지난주 VIP 추천 수익률</p>
+                      <p className="text-emerald-400 text-lg font-bold">+18.7%</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => openUpgradeModal('vip_features', 'VIP 전용 기능을 확인하세요')}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black font-medium rounded-lg transition-colors"
+                  >
+                    업그레이드
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          
           {/* 무료/베이직 회원 업그레이드 배너 */}
           {!isPremium && !planLoading && (
-            <div className="max-w-3xl mx-auto mt-8">
+            <div className="max-w-3xl mx-auto mt-4">
               <UpgradePrompt
                 type="inline"
                 feature="ai_consultations"
@@ -408,6 +562,13 @@ export default function ConsultPage() {
           )}
         </div>
       </main>
+      
+      {/* Character Detail Modal */}
+      <CharacterDetailModal
+        character={char}
+        isOpen={showCharacterModal}
+        onClose={() => setShowCharacterModal(false)}
+      />
     </>
   );
 }

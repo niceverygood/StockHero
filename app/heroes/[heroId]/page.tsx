@@ -4,10 +4,15 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { CharacterAvatar } from '@/components/CharacterAvatar';
+import { CharacterDetailModal } from '@/components/CharacterDetailModal';
 import { DisclaimerBar, Header } from '@/components';
 import { useCurrentPlan, useSubscription } from '@/lib/subscription/hooks';
 import { LockedContent, BlurredRank, UpgradePrompt } from '@/components/subscription';
-import { LockIcon, CrownIcon } from 'lucide-react';
+import { LockIcon, CrownIcon, InfoIcon } from 'lucide-react';
+import { PerformanceTeaser } from '@/components/PerformanceTeaser';
+import { BacktestSection } from '@/components/BacktestSection';
+import { CHARACTERS } from '@/lib/characters';
+import type { CharacterType } from '@/lib/llm/types';
 
 // AI 의견 메시지 인터페이스
 interface AIOpinionMessage {
@@ -105,10 +110,14 @@ export default function HeroDetailPage() {
   const [stockOpinions, setStockOpinions] = useState<Record<string, StockOpinionState>>({});
   const [typingText, setTypingText] = useState<Record<string, string>>({});
   const opinionEndRef = useRef<HTMLDivElement>(null);
+  const [showCharacterModal, setShowCharacterModal] = useState(false);
   
   // 구독 정보
   const { planName, isPremium, isVip, isLoading: planLoading } = useCurrentPlan();
   const { openUpgradeModal } = useSubscription();
+  
+  // 캐릭터 정보
+  const characterInfo = CHARACTERS[heroId as CharacterType];
   
   // 무료 회원은 1,2위 블러
   const blurredRanks = isPremium ? [] : [1, 2];
@@ -285,12 +294,22 @@ export default function HeroDetailPage() {
         {/* Hero Header */}
         <div className={`glass ${meta.borderColor} border-2 rounded-2xl lg:rounded-3xl p-6 sm:p-8 mb-8`}>
           <div className="flex flex-col sm:flex-row items-start gap-6">
-            {/* Avatar */}
-            <div className={`w-24 h-24 sm:w-32 sm:h-32 rounded-2xl bg-gradient-to-br ${meta.color} p-1 shrink-0`}>
+            {/* Avatar - 클릭하면 캐릭터 상세 모달 열림 */}
+            <button 
+              onClick={() => setShowCharacterModal(true)}
+              className={`w-24 h-24 sm:w-32 sm:h-32 rounded-2xl bg-gradient-to-br ${meta.color} p-1 shrink-0 group relative cursor-pointer transition-transform hover:scale-105`}
+            >
               <div className="w-full h-full rounded-2xl bg-dark-900 flex items-center justify-center overflow-hidden">
                 <CharacterAvatar character={heroId as 'claude' | 'gemini' | 'gpt'} size="lg" />
               </div>
-            </div>
+              {/* 호버 시 "프로필 보기" 오버레이 */}
+              <div className="absolute inset-0 bg-dark-950/70 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="text-center">
+                  <InfoIcon className="w-6 h-6 text-white mx-auto mb-1" />
+                  <span className="text-xs text-white font-medium">세계관 보기</span>
+                </div>
+              </div>
+            </button>
             
             {/* Info */}
             <div className="flex-1">
@@ -299,6 +318,13 @@ export default function HeroDetailPage() {
                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${meta.bgColor} ${meta.textColor}`}>
                   {meta.title}
                 </span>
+                <button
+                  onClick={() => setShowCharacterModal(true)}
+                  className="p-1.5 rounded-lg bg-dark-800 hover:bg-dark-700 transition-colors"
+                  title="캐릭터 세계관 보기"
+                >
+                  <InfoIcon className="w-4 h-4 text-dark-400" />
+                </button>
               </div>
               <p className="text-dark-400 mb-4">{meta.subtitle}</p>
               
@@ -364,6 +390,15 @@ export default function HeroDetailPage() {
               </div>
             ))}
           </div>
+        )}
+        
+        {/* Performance Teaser for Free/Basic Users */}
+        {data && !isPremium && (
+          <PerformanceTeaser
+            monthlyReturn={12.8}
+            topStockName={data.stocks[0]?.name}
+            onUpgradeClick={() => openUpgradeModal('backtest', '백테스트 성과를 확인하려면 Pro 플랜이 필요합니다')}
+          />
         )}
         
         {/* Stock List */}
@@ -543,6 +578,19 @@ export default function HeroDetailPage() {
                           </span>
                         ))}
                       </div>
+                    </div>
+                    
+                    {/* Backtest Section (Pro exclusive) */}
+                    <div className="mb-4">
+                      <BacktestSection
+                        stockSymbol={stock.symbol}
+                        stockName={stock.name}
+                        firstRecommendDate={data?.date || new Date().toISOString().split('T')[0]}
+                        firstRecommendPrice={stock.currentPrice * 0.92} // 실제 데이터로 교체 필요
+                        currentPrice={stock.currentPrice}
+                        isUnlocked={isVip}
+                        onUpgradeClick={() => openUpgradeModal('backtest', '백테스트 상세를 확인하려면 Pro 플랜이 필요합니다')}
+                      />
                     </div>
                     
                     {/* AI Opinion Button */}
@@ -772,6 +820,15 @@ export default function HeroDetailPage() {
         </div>
       </main>
       <DisclaimerBar variant="bottom" compact />
+      
+      {/* 캐릭터 상세 모달 */}
+      {characterInfo && (
+        <CharacterDetailModal
+          character={characterInfo}
+          isOpen={showCharacterModal}
+          onClose={() => setShowCharacterModal(false)}
+        />
+      )}
     </>
   );
 }

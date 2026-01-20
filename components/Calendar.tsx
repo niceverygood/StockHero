@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Lock } from 'lucide-react';
 import { CharacterAvatar } from './CharacterAvatar';
 import { CHARACTERS } from '@/lib/characters';
 import type { CharacterType } from '@/lib/types';
+import { useCurrentPlan } from '@/lib/subscription/hooks';
+import { UpgradeModal } from './UpgradeModal';
 
 interface Top5Item {
   rank: number;
@@ -72,9 +75,42 @@ export function Calendar({ onDateSelect }: CalendarProps) {
   const [verdicts, setVerdicts] = useState<Record<string, DailyVerdict>>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+  // 구독 정보
+  const { planName, isPremium, isVip } = useCurrentPlan();
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+
+  // 등급별 과거 이력 접근 일수
+  const getHistoryDays = (): number => {
+    if (planName === 'pro' || planName === 'vip' || isVip) return -1; // 무제한
+    if (planName === 'basic' || isPremium) return 7; // 7일
+    return 0; // free: 오늘만
+  };
+
+  // 날짜 접근 가능 여부 확인
+  const isDateAccessible = (dateStr: string): boolean => {
+    const historyDays = getHistoryDays();
+    if (historyDays === -1) return true; // 무제한
+
+    const targetDate = new Date(dateStr);
+    targetDate.setHours(0, 0, 0, 0);
+    
+    const todayTime = new Date();
+    todayTime.setHours(0, 0, 0, 0);
+
+    if (historyDays === 0) {
+      // 오늘만 접근 가능
+      return targetDate.getTime() === todayTime.getTime();
+    }
+
+    // N일 이내 접근 가능
+    const limitDate = new Date(todayTime);
+    limitDate.setDate(todayTime.getDate() - historyDays);
+    return targetDate >= limitDate;
+  };
 
   useEffect(() => {
     fetchMonthVerdicts();
@@ -134,6 +170,12 @@ export function Calendar({ onDateSelect }: CalendarProps) {
   }
 
   function handleDateClick(dateStr: string) {
+    // 접근 권한 체크
+    if (!isDateAccessible(dateStr)) {
+      setShowUpgradeModal(true);
+      return;
+    }
+    
     setSelectedDate(dateStr);
     const verdict = verdicts[dateStr] || null;
     onDateSelect?.(dateStr, verdict);
@@ -163,18 +205,27 @@ export function Calendar({ onDateSelect }: CalendarProps) {
     const isSelected = dateStr === selectedDate;
     const isPast = new Date(dateStr) < today;
     const isWeekend = (startingDay + day - 1) % 7 === 0 || (startingDay + day - 1) % 7 === 6;
+    const isLocked = !isDateAccessible(dateStr) && verdict;
 
     days.push(
       <div
         key={day}
         onClick={() => handleDateClick(dateStr)}
         className={`
-          min-h-[60px] sm:min-h-[80px] md:min-h-[96px] p-1 sm:p-1.5 md:p-2 rounded-lg sm:rounded-xl cursor-pointer transition-all duration-200 border
+          relative min-h-[60px] sm:min-h-[80px] md:min-h-[96px] p-1 sm:p-1.5 md:p-2 rounded-lg sm:rounded-xl cursor-pointer transition-all duration-200 border
           ${isSelected ? 'border-brand-500 bg-brand-500/10' : 'border-dark-800/50 hover:border-dark-700'}
           ${isToday ? 'ring-2 ring-brand-500/50' : ''}
           ${isPast ? 'opacity-70' : ''}
+          ${isLocked ? 'hover:border-amber-500/50' : ''}
         `}
       >
+        {/* 잠금 오버레이 */}
+        {isLocked && (
+          <div className="absolute inset-0 bg-dark-900/60 rounded-lg sm:rounded-xl flex items-center justify-center z-10 backdrop-blur-[1px]">
+            <Lock className="w-4 h-4 text-dark-500" />
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-0.5 sm:mb-1">
           <span className={`
             text-xs sm:text-sm font-medium
@@ -191,7 +242,7 @@ export function Calendar({ onDateSelect }: CalendarProps) {
         </div>
         
         {verdict && (
-          <div className="space-y-0 sm:space-y-0.5 overflow-hidden">
+          <div className={`space-y-0 sm:space-y-0.5 overflow-hidden ${isLocked ? 'blur-sm' : ''}`}>
             {verdict.top5.slice(0, 3).map((item, i) => (
               <div key={i} className="flex items-center gap-0.5 sm:gap-1 text-2xs sm:text-xs">
                 <span className="text-dark-600 shrink-0">{i + 1}</span>
@@ -275,6 +326,33 @@ export function Calendar({ onDateSelect }: CalendarProps) {
           {days}
         </div>
       )}
+
+      {/* 구독 등급별 접근 안내 */}
+      {planName === 'free' && (
+        <div className="mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+          <div className="flex items-center gap-2">
+            <Lock className="w-4 h-4 text-amber-400" />
+            <p className="text-xs text-amber-300">
+              무료 회원은 오늘 데이터만 확인 가능합니다. 
+              <button 
+                onClick={() => setShowUpgradeModal(true)}
+                className="ml-1 text-amber-400 hover:underline font-medium"
+              >
+                Premium으로 업그레이드
+              </button>
+              하면 7일 이력을 확인할 수 있어요!
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* 업그레이드 모달 */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        currentTier={planName === 'vip' ? 'pro' : planName === 'basic' ? 'premium' : planName as 'free' | 'premium' | 'pro'}
+        highlightFeature="history"
+      />
     </div>
   );
 }

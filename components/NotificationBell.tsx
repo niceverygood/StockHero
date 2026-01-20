@@ -30,7 +30,7 @@ const NOTIFICATION_STYLES: Record<string, { icon: string; color: string }> = {
 
 export function NotificationBell() {
   const { user } = useAuth();
-  const { currentPlan, loading: planLoading } = useCurrentPlan();
+  const { plan: currentPlan, planName, isLoading: planLoading } = useCurrentPlan();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -38,7 +38,7 @@ export function NotificationBell() {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // 플랜 확인
-  const isFreeUser = !planLoading && (!currentPlan || currentPlan.name === 'free');
+  const isFreeUser = !planLoading && planName === 'free';
 
   // 알림 데이터 로드
   const fetchNotifications = async () => {

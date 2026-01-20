@@ -60,3 +60,13 @@ export {
   checkPlanAccess,
   type PlanName,
 } from './guard';
+
+// 결제 관련
+export {
+  SUBSCRIPTION_PLANS,
+  generateOrderId,
+  calculatePaymentAmount,
+} from './config';
+
+// 포트원 결제 설정
+export { createPaymentConfig } from './portone';

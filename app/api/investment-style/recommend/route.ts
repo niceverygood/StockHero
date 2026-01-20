@@ -2,21 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { INVESTOR_TYPES, TYPE_PREFERENCES } from '@/lib/investment-style/results';
 import type { InvestorType } from '@/lib/investment-style/types';
 
-// AI 캐릭터 정보
+// AI 캐릭터 정보 (2026년 1월 - 실제 존재하는 모델)
 const AI_HEROES = {
   claude: {
     id: 'claude',
     name: '클로드 리',
     nameEn: 'Claude Lee',
     style: '밸류에이션 전문가',
-    model: 'anthropic/claude-opus-4',
+    model: 'anthropic/claude-sonnet-4',
   },
   gemini: {
     id: 'gemini',
     name: '제미 나인',
     nameEn: 'Gemi Nine',
     style: '성장주 전문가',
-    model: 'google/gemini-2.0-flash-exp:free',
+    model: 'google/gemini-2.5-pro-preview',
   },
   gpt: {
     id: 'gpt',

@@ -3,14 +3,24 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { getPlanFeatures, PLAN_ORDER, PLAN_DISPLAY_NAMES } from './utils';
 import type { PlanFeatures, FeatureType } from '@/types/subscription';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy initialization
+let _supabase: SupabaseClient | null = null;
+function getSupabase(): SupabaseClient | null {
+  if (_supabase) return _supabase;
+  
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!url || !key) return null;
+  
+  _supabase = createClient(url, key);
+  return _supabase;
+}
+const supabase = getSupabase();
 
 // 플랜별 제한 설정
 export const PLAN_LIMITS = {

@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Header } from '@/components';
 import { CHARACTERS } from '@/lib/characters';
+import { PerformanceTeaser } from '@/components/PerformanceTeaser';
+import { useCurrentPlan, useSubscription } from '@/lib/subscription/hooks';
 
 const AI_EMOJIS: Record<string, string> = {
   claude: '🔵',
@@ -33,6 +35,10 @@ export default function HomePage() {
   const [verdict, setVerdict] = useState<TodayVerdict | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDebating, setIsDebating] = useState(false);
+  
+  // 구독 정보
+  const { isPremium } = useCurrentPlan();
+  const { openUpgradeModal } = useSubscription();
 
   useEffect(() => {
     fetchTodayVerdict();
@@ -171,6 +177,17 @@ export default function HomePage() {
                   </div>
                 </div>
               </div>
+
+              {/* Performance Teaser for Free Users */}
+              {!isPremium && (
+                <div className="max-w-3xl mx-auto mb-6">
+                  <PerformanceTeaser
+                    monthlyReturn={15.2}
+                    topStockName={verdict.top5[0]?.name}
+                    onUpgradeClick={() => openUpgradeModal('backtest', '백테스트 성과를 확인하려면 Pro 플랜이 필요합니다')}
+                  />
+                </div>
+              )}
 
               {/* Top 5 List */}
               <div className="max-w-3xl mx-auto space-y-4">

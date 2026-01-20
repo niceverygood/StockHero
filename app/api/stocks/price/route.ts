@@ -7,6 +7,27 @@ const KIS_BASE_URL = 'https://openapi.koreainvestment.com:9443';
 // KIS 토큰 캐시
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
+// 주가 캐시 (1분)
+const priceCache = new Map<string, { data: any; timestamp: number }>();
+const PRICE_CACHE_TTL = 60 * 1000; // 1분
+
+function getCachedPrice(symbol: string) {
+  const cached = priceCache.get(symbol);
+  if (cached && Date.now() - cached.timestamp < PRICE_CACHE_TTL) {
+    return cached.data;
+  }
+  return null;
+}
+
+function setCachedPrice(symbol: string, data: any) {
+  priceCache.set(symbol, { data, timestamp: Date.now() });
+  // 캐시 크기 제한 (최대 100개)
+  if (priceCache.size > 100) {
+    const firstKey = priceCache.keys().next().value;
+    if (firstKey) priceCache.delete(firstKey);
+  }
+}
+
 async function getKISToken(): Promise<string | null> {
   if (cachedToken && cachedToken.expiresAt > Date.now()) {
     return cachedToken.token;
@@ -104,6 +125,17 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // 캐시 확인
+    const cached = getCachedPrice(symbol);
+    if (cached) {
+      return NextResponse.json({
+        success: true,
+        data: cached,
+        source: 'cache',
+        timestamp: new Date().toISOString(),
+      });
+    }
+    
     // 로컬 데이터에서 종목 정보 확인
     const localStock = findStockBySymbol(symbol);
 
@@ -117,18 +149,23 @@ export async function GET(request: NextRequest) {
       else if (market === 'KQ') market = 'KOSDAQ';
       else if (market === 'KN') market = 'KONEX';
       
+      const priceData = {
+        symbol,
+        name: naverPrice.name || localStock?.name || symbol,
+        market: market || localStock?.market || 'KOSPI',
+        sector: localStock?.sector || '미분류',
+        price: naverPrice.price,
+        change: naverPrice.change,
+        changePercent: naverPrice.changePercent,
+        volume: naverPrice.volume,
+      };
+      
+      // 캐시 저장
+      setCachedPrice(symbol, priceData);
+      
       return NextResponse.json({
         success: true,
-        data: {
-          symbol,
-          name: naverPrice.name || localStock?.name || symbol,
-          market: market || localStock?.market || 'KOSPI',
-          sector: localStock?.sector || '미분류',
-          price: naverPrice.price,
-          change: naverPrice.change,
-          changePercent: naverPrice.changePercent,
-          volume: naverPrice.volume,
-        },
+        data: priceData,
         source: 'naver',
         timestamp: new Date().toISOString(),
       });
@@ -138,21 +175,26 @@ export async function GET(request: NextRequest) {
     const kisPrice = await fetchKISPrice(symbol);
     
     if (kisPrice && kisPrice.price > 0) {
+      const priceData = {
+        symbol,
+        name: kisPrice.name || localStock?.name || symbol,
+        market: localStock?.market || 'KOSPI',
+        sector: localStock?.sector || '미분류',
+        price: kisPrice.price,
+        change: kisPrice.change,
+        changePercent: kisPrice.changePercent,
+        volume: kisPrice.volume,
+        high: kisPrice.high,
+        low: kisPrice.low,
+        open: kisPrice.open,
+      };
+      
+      // 캐시 저장
+      setCachedPrice(symbol, priceData);
+      
       return NextResponse.json({
         success: true,
-        data: {
-          symbol,
-          name: kisPrice.name || localStock?.name || symbol,
-          market: localStock?.market || 'KOSPI',
-          sector: localStock?.sector || '미분류',
-          price: kisPrice.price,
-          change: kisPrice.change,
-          changePercent: kisPrice.changePercent,
-          volume: kisPrice.volume,
-          high: kisPrice.high,
-          low: kisPrice.low,
-          open: kisPrice.open,
-        },
+        data: priceData,
         source: 'kis',
         timestamp: new Date().toISOString(),
       });

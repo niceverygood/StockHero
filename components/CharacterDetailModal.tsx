@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { CharacterInfo, CHARACTERS } from '@/lib/characters';
+import { CharacterInfo, CHARACTERS, DEBATE_DYNAMICS } from '@/lib/characters';
 import { AIConsultation } from './AIConsultation';
 import type { CharacterType } from '@/lib/llm/types';
 
@@ -24,6 +24,7 @@ interface CharacterDetailModalProps {
 export function CharacterDetailModal({ character, isOpen, onClose, holdings = [], onViewDebate }: CharacterDetailModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const [showConsultation, setShowConsultation] = useState(false);
+  const [activeTab, setActiveTab] = useState<'profile' | 'worldview' | 'debate'>('profile');
 
   useEffect(() => {
     function handleEscape(e: KeyboardEvent) {
@@ -63,6 +64,7 @@ export function CharacterDetailModal({ character, isOpen, onClose, holdings = []
   useEffect(() => {
     if (!isOpen) {
       setShowConsultation(false);
+      setActiveTab('profile');
     }
   }, [isOpen, character]);
 
@@ -110,7 +112,7 @@ export function CharacterDetailModal({ character, isOpen, onClose, holdings = []
               
               <div className="relative flex items-start gap-6">
                 {/* Character Image */}
-                <div className="flex-shrink-0 w-28 h-28 rounded-2xl overflow-hidden bg-white/10 ring-4 ring-white/20">
+                <div className="flex-shrink-0 w-28 h-28 rounded-2xl overflow-hidden bg-white/10 ring-4 ring-white/20 shadow-xl">
                   <Image
                     src={character.image}
                     alt={character.name}
@@ -124,7 +126,7 @@ export function CharacterDetailModal({ character, isOpen, onClose, holdings = []
                 <div className="flex-1 pt-2">
                   <h2 className="text-2xl font-bold text-white mb-1">{character.name}</h2>
                   <p className="text-white/80 text-sm mb-1">{character.nameKo}</p>
-                  <p className="text-white/60 text-sm mb-3">{character.role}</p>
+                  <p className="text-white/60 text-sm mb-3">{character.roleKo}</p>
                   
                   <div className="flex flex-wrap gap-2">
                     {character.tags.map((tag) => (
@@ -170,7 +172,7 @@ export function CharacterDetailModal({ character, isOpen, onClose, holdings = []
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
-                💬 {character.name}에게 보유종목 상담받기
+                💬 {character.nameKo}에게 상담받기
                 {holdings.length > 0 && (
                   <span className="px-2 py-0.5 rounded-full bg-white/30 text-sm font-medium">
                     {holdings.length}종목 연동
@@ -179,58 +181,268 @@ export function CharacterDetailModal({ character, isOpen, onClose, holdings = []
               </button>
             </div>
 
+            {/* Tab Navigation */}
+            <div className="px-6 pt-6">
+              <div className="flex gap-1 p-1 bg-dark-800 rounded-xl">
+                {[
+                  { id: 'profile', label: '프로필', icon: '👤' },
+                  { id: 'worldview', label: '세계관', icon: '🌍' },
+                  { id: 'debate', label: '토론 스타일', icon: '⚔️' },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                    className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
+                      activeTab === tab.id
+                        ? `bg-gradient-to-r ${character.gradient} text-white shadow-lg`
+                        : 'text-dark-400 hover:text-dark-200 hover:bg-dark-700'
+                    }`}
+                  >
+                    <span className="mr-1.5">{tab.icon}</span>
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Content */}
             <div className="p-6 space-y-6">
-              {/* Catchphrase */}
-              <div className={`p-4 rounded-xl ${character.bgColor} border border-current/10`}>
-                <p className={`text-sm italic ${character.color}`}>{character.catchphrase}</p>
-              </div>
+              {activeTab === 'profile' && (
+                <>
+                  {/* Catchphrase */}
+                  <div className={`p-4 rounded-xl ${character.bgColor} border ${character.borderColor}`}>
+                    <p className={`text-lg font-medium italic ${character.color}`}>{character.catchphrase}</p>
+                  </div>
 
-              {/* Bio */}
-              <div>
-                <h3 className="text-sm font-semibold text-dark-400 uppercase tracking-wider mb-3">About</h3>
-                <p className="text-dark-300 leading-relaxed">{character.fullBio}</p>
-              </div>
+                  {/* Bio */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-dark-400 uppercase tracking-wider mb-3">소개</h3>
+                    <p className="text-dark-300 leading-relaxed whitespace-pre-line">{character.fullBio}</p>
+                  </div>
 
-              {/* Analysis Style */}
-              <div>
-                <h3 className="text-sm font-semibold text-dark-400 uppercase tracking-wider mb-3">Analysis Style</h3>
-                <p className="text-dark-300 leading-relaxed">{character.analysisStyle}</p>
-              </div>
+                  {/* Analysis Style */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-dark-400 uppercase tracking-wider mb-3">분석 스타일</h3>
+                    <p className="text-dark-300 leading-relaxed">{character.analysisStyle}</p>
+                  </div>
 
-              {/* Two columns for Strengths and Focus Areas */}
-              <div className="grid md:grid-cols-2 gap-6">
-                {/* Strengths */}
-                <div>
-                  <h3 className="text-sm font-semibold text-dark-400 uppercase tracking-wider mb-3">Strengths</h3>
-                  <ul className="space-y-2">
-                    {character.strengths.map((strength, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm text-dark-300">
-                        <svg className={`w-4 h-4 ${character.color} flex-shrink-0`} fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                        {strength}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                  {/* Signature Phrases */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-dark-400 uppercase tracking-wider mb-3">자주 쓰는 말</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {character.signaturePhrases.map((phrase, i) => (
+                        <span
+                          key={i}
+                          className={`px-3 py-1.5 rounded-full bg-dark-800 border ${character.borderColor} text-sm text-dark-300`}
+                        >
+                          &ldquo;{phrase}&rdquo;
+                        </span>
+                      ))}
+                    </div>
+                  </div>
 
-                {/* Focus Areas */}
-                <div>
-                  <h3 className="text-sm font-semibold text-dark-400 uppercase tracking-wider mb-3">Focus Areas</h3>
-                  <ul className="space-y-2">
-                    {character.focusAreas.map((area, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm text-dark-300">
-                        <span className={`w-1.5 h-1.5 rounded-full bg-gradient-to-r ${character.gradient}`} />
-                        {area}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
+                  {/* Two columns for Strengths and Focus Areas */}
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {/* Strengths */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-dark-400 uppercase tracking-wider mb-3">강점</h3>
+                      <ul className="space-y-2">
+                        {character.strengths.map((strength, i) => (
+                          <li key={i} className="flex items-center gap-2 text-sm text-dark-300">
+                            <svg className={`w-4 h-4 ${character.color} flex-shrink-0`} fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            {strength}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Focus Areas */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-dark-400 uppercase tracking-wider mb-3">집중 분야</h3>
+                      <ul className="space-y-2">
+                        {character.focusAreas.map((area, i) => (
+                          <li key={i} className="flex items-center gap-2 text-sm text-dark-300">
+                            <span className={`w-1.5 h-1.5 rounded-full bg-gradient-to-r ${character.gradient}`} />
+                            {area}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {activeTab === 'worldview' && (
+                <>
+                  {/* Education & Career */}
+                  <div className={`p-5 rounded-xl ${character.bgColor} border ${character.borderColor}`}>
+                    <h3 className="font-bold text-dark-100 mb-4 flex items-center gap-2">
+                      <span>🎓</span> 학력 & 경력
+                    </h3>
+                    <div className="space-y-4">
+                      <div>
+                        <span className="text-xs font-medium text-dark-500 uppercase">Education</span>
+                        <p className="text-dark-200 mt-1">{character.background.education}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs font-medium text-dark-500 uppercase">Career</span>
+                        <div className="mt-2 space-y-2">
+                          {character.background.career.map((job, i) => (
+                            <div key={i} className="flex items-center gap-3">
+                              <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${character.gradient}`} />
+                              <span className="text-dark-300 text-sm">{job}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Philosophy */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-dark-400 uppercase tracking-wider mb-3">투자 철학</h3>
+                    <div className="p-4 rounded-xl bg-dark-800 border border-dark-700">
+                      <p className="text-dark-300 leading-relaxed italic">&ldquo;{character.background.philosophy}&rdquo;</p>
+                    </div>
+                  </div>
+
+                  {/* Personality */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-dark-400 uppercase tracking-wider mb-3">성격 특성</h3>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {character.personality.traits.map((trait, i) => (
+                        <span
+                          key={i}
+                          className={`px-3 py-1.5 rounded-full bg-gradient-to-r ${character.gradient} text-white text-sm font-medium`}
+                        >
+                          {trait}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <span className="text-xs font-medium text-dark-500">말투</span>
+                        <p className="text-dark-300 text-sm mt-1">{character.personality.speakingStyle}</p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {activeTab === 'debate' && (
+                <>
+                  {/* Debate Style */}
+                  <div className={`p-5 rounded-xl ${character.bgColor} border ${character.borderColor}`}>
+                    <h3 className="font-bold text-dark-100 mb-3 flex items-center gap-2">
+                      <span>🎯</span> 토론 포지션
+                    </h3>
+                    <p className="text-dark-300 leading-relaxed">{character.personality.debateStyle}</p>
+                  </div>
+
+                  {/* Debate Dynamics */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-dark-400 uppercase tracking-wider mb-4">다른 애널리스트와의 관계</h3>
+                    <div className="space-y-4">
+                      {character.id === 'claude' && (
+                        <>
+                          <DebateDynamicCard
+                            opponent={CHARACTERS.gemini}
+                            dynamic={DEBATE_DYNAMICS.claudeVsGemini}
+                            myArgument={DEBATE_DYNAMICS.claudeVsGemini.claudeArgument}
+                            opponentArgument={DEBATE_DYNAMICS.claudeVsGemini.geminiArgument}
+                          />
+                          <DebateDynamicCard
+                            opponent={CHARACTERS.gpt}
+                            dynamic={DEBATE_DYNAMICS.claudeVsGpt}
+                            myArgument={DEBATE_DYNAMICS.claudeVsGpt.claudeArgument}
+                            opponentArgument={DEBATE_DYNAMICS.claudeVsGpt.gptArgument}
+                          />
+                        </>
+                      )}
+                      {character.id === 'gemini' && (
+                        <>
+                          <DebateDynamicCard
+                            opponent={CHARACTERS.claude}
+                            dynamic={DEBATE_DYNAMICS.claudeVsGemini}
+                            myArgument={DEBATE_DYNAMICS.claudeVsGemini.geminiArgument}
+                            opponentArgument={DEBATE_DYNAMICS.claudeVsGemini.claudeArgument}
+                          />
+                          <DebateDynamicCard
+                            opponent={CHARACTERS.gpt}
+                            dynamic={DEBATE_DYNAMICS.geminiVsGpt}
+                            myArgument={DEBATE_DYNAMICS.geminiVsGpt.geminiArgument}
+                            opponentArgument={DEBATE_DYNAMICS.geminiVsGpt.gptArgument}
+                          />
+                        </>
+                      )}
+                      {character.id === 'gpt' && (
+                        <>
+                          <DebateDynamicCard
+                            opponent={CHARACTERS.claude}
+                            dynamic={DEBATE_DYNAMICS.claudeVsGpt}
+                            myArgument={DEBATE_DYNAMICS.claudeVsGpt.gptArgument}
+                            opponentArgument={DEBATE_DYNAMICS.claudeVsGpt.claudeArgument}
+                          />
+                          <DebateDynamicCard
+                            opponent={CHARACTERS.gemini}
+                            dynamic={DEBATE_DYNAMICS.geminiVsGpt}
+                            myArgument={DEBATE_DYNAMICS.geminiVsGpt.gptArgument}
+                            opponentArgument={DEBATE_DYNAMICS.geminiVsGpt.geminiArgument}
+                          />
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Debate Dynamic Card Component
+function DebateDynamicCard({
+  opponent,
+  dynamic,
+  myArgument,
+  opponentArgument,
+}: {
+  opponent: CharacterInfo;
+  dynamic: { tension: string };
+  myArgument: string;
+  opponentArgument: string;
+}) {
+  return (
+    <div className="p-4 rounded-xl bg-dark-800 border border-dark-700">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-dark-600">
+          <Image
+            src={opponent.image}
+            alt={opponent.name}
+            width={40}
+            height={40}
+            className="w-full h-full object-cover"
+          />
+        </div>
+        <div>
+          <p className="font-medium text-dark-200">vs {opponent.nameKo}</p>
+          <p className={`text-xs ${opponent.color}`}>{dynamic.tension}</p>
+        </div>
+      </div>
+      <div className="space-y-2 text-sm">
+        <div className="p-2 rounded-lg bg-dark-700/50">
+          <span className="text-dark-500">나: </span>
+          <span className="text-dark-300">&ldquo;{myArgument}&rdquo;</span>
+        </div>
+        <div className={`p-2 rounded-lg ${opponent.bgColor}`}>
+          <span className={`${opponent.color}`}>{opponent.nameKo}: </span>
+          <span className="text-dark-300">&ldquo;{opponentArgument}&rdquo;</span>
+        </div>
       </div>
     </div>
   );

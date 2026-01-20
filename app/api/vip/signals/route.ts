@@ -282,7 +282,7 @@ export async function POST(request: NextRequest) {
     const generatedSignals = [];
     const avgVolume = 1000000; // 기본 평균 거래량 (실제로는 DB에서 조회)
 
-    for (const [symbol, name] of stockMap) {
+    for (const [symbol, name] of Array.from(stockMap.entries())) {
       const techData = await fetchTechnicalData(symbol);
       if (!techData) continue;
 

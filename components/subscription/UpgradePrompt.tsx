@@ -11,11 +11,10 @@ import {
   FEATURE_NAMES,
   getYearlyDiscount,
 } from '@/lib/subscription';
-import type { FeatureType } from '@/types/subscription';
 
 interface UpgradePromptProps {
   type?: 'inline' | 'modal' | 'banner' | 'toast';
-  feature?: FeatureType;
+  feature?: string;
   recommendedPlan?: 'basic' | 'pro' | 'vip';
   successStory?: {
     text: string;

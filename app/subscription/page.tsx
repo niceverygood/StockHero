@@ -11,11 +11,7 @@ import {
   type SubscriptionTier 
 } from '@/lib/subscription/config';
 
-declare global {
-  interface Window {
-    PortOne?: any;
-  }
-}
+// PortOne은 전역으로 이미 선언됨 (pricing 페이지에서)
 
 export default function SubscriptionPage() {
   const { user, loading: authLoading } = useAuth();
@@ -140,8 +136,8 @@ export default function SubscriptionPage() {
       // 포트원 결제 요청
       const result = await window.PortOne.requestPayment(paymentConfig);
 
-      if (result.code === 'FAILURE') {
-        throw new Error(result.message);
+      if (!result || result.code === 'FAILURE') {
+        throw new Error(result?.message || '결제 요청 실패');
       }
 
       // 결제 확인

@@ -59,7 +59,7 @@ interface PerformanceStats {
 
 export default function VIPPage() {
   const { user, loading: authLoading } = useAuth();
-  const { currentPlan, loading: planLoading } = useCurrentPlan();
+  const { plan: currentPlan, planName, isVip, isLoading: planLoading } = useCurrentPlan();
   const router = useRouter();
 
   const [vipStocks, setVipStocks] = useState<VIPStock[]>([]);

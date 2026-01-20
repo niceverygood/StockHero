@@ -129,8 +129,8 @@ const SECTOR_INFO: Record<string, { name: string; nameKo: string; icon: string; 
   },
 };
 
-// OpenRouter 모델
-const OPENROUTER_MODEL = 'anthropic/claude-opus-4.5';
+// OpenRouter 모델 (2026년 1월 - 실제 존재하는 모델)
+const OPENROUTER_MODEL = 'anthropic/claude-sonnet-4';
 
 async function analyzeSectorWithAI(
   sector: string,

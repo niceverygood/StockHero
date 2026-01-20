@@ -1,9 +1,9 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { useSubscription, useFeatureUsage } from '@/lib/subscription/hooks';
+import { useCurrentPlan } from '@/lib/subscription/hooks';
 import { LockOverlay, UpgradePrompt, UsageBadge } from './UpgradePrompt';
-import { FEATURE_LIMITS, SUBSCRIPTION_ENABLED } from '@/lib/subscription/config';
+import { FEATURE_LIMITS, SUBSCRIPTION_ENABLED, canAccessFeature, getFeatureLimit, type SubscriptionTier } from '@/lib/subscription/config';
 
 interface FeatureGateProps {
   feature: keyof typeof FEATURE_LIMITS;
@@ -33,8 +33,8 @@ export function FeatureGate({
   showUsage = false,
   fallback,
 }: FeatureGateProps) {
-  const { hasAccess, isPro, isPremium, isLoading } = useSubscription();
-  const { currentUsage, limit, canUse, isLoading: usageLoading } = useFeatureUsage(feature);
+  const { planName, isPremium, isVip, isLoading } = useCurrentPlan();
+  const tier = (planName || 'free') as SubscriptionTier;
 
   // 구독 기능 비활성화 시 바로 children 렌더링
   if (!SUBSCRIPTION_ENABLED) {
@@ -42,7 +42,7 @@ export function FeatureGate({
   }
 
   // 로딩 중
-  if (isLoading || usageLoading) {
+  if (isLoading) {
     return (
       <div className="animate-pulse">
         <div className="bg-dark-700 rounded-lg h-32 w-full" />
@@ -51,12 +51,14 @@ export function FeatureGate({
   }
 
   // 기능 접근 권한 확인
-  const hasFeatureAccess = hasAccess(feature);
+  const hasFeatureAccess = canAccessFeature(tier, feature);
+  const featureLimit = getFeatureLimit(tier, feature);
+  const isPro = planName === 'pro' || planName === 'vip';
 
   // 티어 요구사항 확인
   const meetsRequiredTier = !requiredTier || 
     (requiredTier === 'pro' && isPro) || 
-    (requiredTier === 'premium' && isPremium);
+    (requiredTier === 'premium' && (isPremium || isPro));
 
   // 접근 불가 - 티어 부족
   if (!meetsRequiredTier || !hasFeatureAccess) {
@@ -73,31 +75,12 @@ export function FeatureGate({
     );
   }
 
-  // 접근 불가 - 사용량 초과
-  if (!canUse && limit > 0) {
-    return (
-      <div className="space-y-4">
-        <UpgradePrompt
-          feature={FEATURE_LIMITS[feature]?.name || feature}
-          requiredTier={isPro ? 'premium' : 'pro'}
-          currentUsage={currentUsage}
-          limit={limit}
-        />
-        {fallback || (
-          <LockOverlay requiredTier={isPro ? 'premium' : 'pro'}>
-            {children}
-          </LockOverlay>
-        )}
-      </div>
-    );
-  }
-
   // 접근 가능
   return (
     <div className="relative">
-      {showUsage && limit !== -1 && (
+      {showUsage && featureLimit !== -1 && (
         <div className="absolute top-2 right-2 z-10">
-          <UsageBadge currentUsage={currentUsage} limit={limit} />
+          <UsageBadge currentUsage={0} limit={featureLimit} />
         </div>
       )}
       {children}
@@ -126,8 +109,8 @@ export function withFeatureGate<P extends object>(
  * useFeatureGate - 훅 버전 (프로그래밍 방식 접근 제어)
  */
 export function useFeatureGate(feature: keyof typeof FEATURE_LIMITS) {
-  const { hasAccess, isPro, isPremium, tier } = useSubscription();
-  const { currentUsage, limit, canUse, increment, remaining } = useFeatureUsage(feature);
+  const { planName, isPremium, isVip, isLoading } = useCurrentPlan();
+  const tier = (planName || 'free') as SubscriptionTier;
 
   // 구독 기능 비활성화 시 모든 기능 허용
   if (!SUBSCRIPTION_ENABLED) {
@@ -145,28 +128,32 @@ export function useFeatureGate(feature: keyof typeof FEATURE_LIMITS) {
     };
   }
 
+  const hasFeatureAccess = canAccessFeature(tier, feature);
+  const featureLimit = getFeatureLimit(tier, feature);
+  const isPro = planName === 'pro' || planName === 'vip';
+
   return {
     // 접근 가능 여부
-    canAccess: hasAccess(feature) && canUse,
+    canAccess: hasFeatureAccess,
     
     // 사용량 정보
-    currentUsage,
-    limit,
-    remaining,
+    currentUsage: 0,
+    limit: featureLimit,
+    remaining: featureLimit === -1 ? Infinity : featureLimit,
     
-    // 사용량 증가 (사용 전 호출)
-    use: increment,
+    // 사용량 증가 (사용 전 호출) - 서버에서 처리
+    use: async () => true,
     
     // 구독 정보
-    tier,
+    tier: planName,
     isPro,
     isPremium,
     
     // 업그레이드 필요 여부
-    needsUpgrade: !hasAccess(feature) || !canUse,
+    needsUpgrade: !hasFeatureAccess,
     
     // 필요한 티어
-    requiredTier: !hasAccess(feature) 
+    requiredTier: !hasFeatureAccess 
       ? (isPro ? 'premium' : 'pro') 
       : null,
   };
