@@ -546,33 +546,54 @@ export default function CalendarPage() {
                   {/* AI별 추천 통계 */}
                   <div className="bg-dark-800/30 rounded-xl p-4 mb-4">
                     <p className="text-sm font-medium text-dark-400 mb-3">🤖 AI별 추천 현황</p>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="text-center p-2 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-                        <p className="text-purple-400 text-lg font-bold">{selectedStock.claudeVotes}회</p>
-                        <p className="text-xs text-dark-500">🔵 Claude</p>
+                    
+                    {/* 상세 데이터 존재 여부 확인 */}
+                    {(selectedStock.claudeVotes + selectedStock.geminiVotes + selectedStock.gptVotes) > 0 ? (
+                      <>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="text-center p-2 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                            <p className="text-purple-400 text-lg font-bold">{selectedStock.claudeVotes}회</p>
+                            <p className="text-xs text-dark-500">🔵 Claude</p>
+                          </div>
+                          <div className="text-center p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                            <p className="text-blue-400 text-lg font-bold">{selectedStock.geminiVotes}회</p>
+                            <p className="text-xs text-dark-500">🟣 Gemini</p>
+                          </div>
+                          <div className="text-center p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                            <p className="text-emerald-400 text-lg font-bold">{selectedStock.gptVotes}회</p>
+                            <p className="text-xs text-dark-500">🟢 GPT</p>
+                          </div>
+                        </div>
+                        {/* 만장일치 정보 */}
+                        <div className="mt-3 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-amber-400">✨</span>
+                            <span className="text-sm text-dark-300">만장일치</span>
+                          </div>
+                          <span className="text-amber-400 font-bold">
+                            {selectedStock.unanimousDays}회 / {selectedStock.totalDays}회
+                            <span className="ml-1 text-xs text-dark-500">
+                              ({selectedStock.totalDays > 0 ? Math.round((selectedStock.unanimousDays / selectedStock.totalDays) * 100) : 0}%)
+                            </span>
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      /* 상세 데이터 없는 경우 */
+                      <div className="text-center p-4 bg-dark-800/50 rounded-lg border border-dark-700/50">
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                          <span className="text-xl">🔵</span>
+                          <span className="text-xl">🟣</span>
+                          <span className="text-xl">🟢</span>
+                        </div>
+                        <p className="text-dark-400 text-sm mb-1">AI 합산 추천</p>
+                        <p className="text-2xl font-bold text-brand-400">{selectedStock.totalDays}회</p>
+                        <p className="text-xs text-dark-600 mt-2">
+                          * 이전 버전 데이터로 AI별 상세 통계가 없습니다<br/>
+                          새로 생성되는 데이터부터 상세 정보가 기록됩니다
+                        </p>
                       </div>
-                      <div className="text-center p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                        <p className="text-blue-400 text-lg font-bold">{selectedStock.geminiVotes}회</p>
-                        <p className="text-xs text-dark-500">🟣 Gemini</p>
-                      </div>
-                      <div className="text-center p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                        <p className="text-emerald-400 text-lg font-bold">{selectedStock.gptVotes}회</p>
-                        <p className="text-xs text-dark-500">🟢 GPT</p>
-                      </div>
-                    </div>
-                    {/* 만장일치 정보 */}
-                    <div className="mt-3 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-amber-400">✨</span>
-                        <span className="text-sm text-dark-300">만장일치</span>
-                      </div>
-                      <span className="text-amber-400 font-bold">
-                        {selectedStock.unanimousDays}회 / {selectedStock.totalDays}회
-                        <span className="ml-1 text-xs text-dark-500">
-                          ({selectedStock.totalDays > 0 ? Math.round((selectedStock.unanimousDays / selectedStock.totalDays) * 100) : 0}%)
-                        </span>
-                      </span>
-                    </div>
+                    )}
                   </div>
 
                   {/* Price Comparison */}
@@ -653,6 +674,14 @@ export default function CalendarPage() {
                           const currentPrice = stockPrices[selectedStock.symbol]?.price;
                           const returnPct = rec.price && currentPrice ? calculateReturn(currentPrice, rec.price) : null;
                           
+                          // 개별 AI 점수가 있는지 확인
+                          const hasDetailedScores = rec.claudeScore > 0 || rec.geminiScore > 0 || rec.gptScore > 0;
+                          
+                          // 추천한 AI 개수 추정 (상세 점수 없는 경우)
+                          const estimatedVoters = hasDetailedScores 
+                            ? rec.votedCount 
+                            : Math.max(1, Math.ceil(rec.score / 1.7)); // avgScore 기반 추정
+                          
                           return (
                             <div
                               key={rec.date}
@@ -662,16 +691,20 @@ export default function CalendarPage() {
                                   : 'bg-dark-800/50 border-dark-700/50'
                               }`}
                             >
-                              {/* 헤더: 날짜, 순위, 만장일치 배지 */}
+                              {/* 헤더: 날짜, 순위, 배지 */}
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
                                   <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${getRankBadge(rec.rank)}`}>
                                     {rec.rank}
                                   </div>
                                   <span className="text-sm font-medium text-dark-200">{rec.date}</span>
-                                  {rec.isUnanimous && (
+                                  {rec.isUnanimous ? (
                                     <span className="px-1.5 py-0.5 text-[10px] bg-amber-500/20 text-amber-400 rounded font-bold">
                                       ✨ 만장일치
+                                    </span>
+                                  ) : (
+                                    <span className="px-1.5 py-0.5 text-[10px] bg-dark-700 text-dark-400 rounded">
+                                      {hasDetailedScores ? `${rec.votedCount}/3 추천` : `추정 ${estimatedVoters}/3`}
                                     </span>
                                   )}
                                 </div>
@@ -687,45 +720,68 @@ export default function CalendarPage() {
                                 </div>
                               </div>
                               
-                              {/* AI별 점수 */}
-                              <div className="grid grid-cols-3 gap-1.5">
-                                <div className={`text-center py-1.5 rounded-lg ${
-                                  rec.claudeScore > 0 
-                                    ? 'bg-purple-500/20 border border-purple-500/30' 
-                                    : 'bg-dark-800/50 border border-dark-700/30'
-                                }`}>
-                                  <span className="text-xs">🔵</span>
-                                  <span className={`ml-1 text-xs font-bold ${
-                                    rec.claudeScore > 0 ? 'text-purple-400' : 'text-dark-600'
+                              {/* AI별 점수 - 상세 데이터가 있을 때만 */}
+                              {hasDetailedScores ? (
+                                <div className="grid grid-cols-3 gap-1.5">
+                                  <div className={`text-center py-1.5 rounded-lg ${
+                                    rec.claudeScore > 0 
+                                      ? 'bg-purple-500/20 border border-purple-500/30' 
+                                      : 'bg-dark-800/50 border border-dark-700/30'
                                   }`}>
-                                    {rec.claudeScore > 0 ? rec.claudeScore.toFixed(1) : '-'}
-                                  </span>
-                                </div>
-                                <div className={`text-center py-1.5 rounded-lg ${
-                                  rec.geminiScore > 0 
-                                    ? 'bg-blue-500/20 border border-blue-500/30' 
-                                    : 'bg-dark-800/50 border border-dark-700/30'
-                                }`}>
-                                  <span className="text-xs">🟣</span>
-                                  <span className={`ml-1 text-xs font-bold ${
-                                    rec.geminiScore > 0 ? 'text-blue-400' : 'text-dark-600'
+                                    <span className="text-xs">🔵</span>
+                                    <span className={`ml-1 text-xs font-bold ${
+                                      rec.claudeScore > 0 ? 'text-purple-400' : 'text-dark-600'
+                                    }`}>
+                                      {rec.claudeScore > 0 ? rec.claudeScore.toFixed(1) : '-'}
+                                    </span>
+                                  </div>
+                                  <div className={`text-center py-1.5 rounded-lg ${
+                                    rec.geminiScore > 0 
+                                      ? 'bg-blue-500/20 border border-blue-500/30' 
+                                      : 'bg-dark-800/50 border border-dark-700/30'
                                   }`}>
-                                    {rec.geminiScore > 0 ? rec.geminiScore.toFixed(1) : '-'}
-                                  </span>
-                                </div>
-                                <div className={`text-center py-1.5 rounded-lg ${
-                                  rec.gptScore > 0 
-                                    ? 'bg-emerald-500/20 border border-emerald-500/30' 
-                                    : 'bg-dark-800/50 border border-dark-700/30'
-                                }`}>
-                                  <span className="text-xs">🟢</span>
-                                  <span className={`ml-1 text-xs font-bold ${
-                                    rec.gptScore > 0 ? 'text-emerald-400' : 'text-dark-600'
+                                    <span className="text-xs">🟣</span>
+                                    <span className={`ml-1 text-xs font-bold ${
+                                      rec.geminiScore > 0 ? 'text-blue-400' : 'text-dark-600'
+                                    }`}>
+                                      {rec.geminiScore > 0 ? rec.geminiScore.toFixed(1) : '-'}
+                                    </span>
+                                  </div>
+                                  <div className={`text-center py-1.5 rounded-lg ${
+                                    rec.gptScore > 0 
+                                      ? 'bg-emerald-500/20 border border-emerald-500/30' 
+                                      : 'bg-dark-800/50 border border-dark-700/30'
                                   }`}>
-                                    {rec.gptScore > 0 ? rec.gptScore.toFixed(1) : '-'}
-                                  </span>
+                                    <span className="text-xs">🟢</span>
+                                    <span className={`ml-1 text-xs font-bold ${
+                                      rec.gptScore > 0 ? 'text-emerald-400' : 'text-dark-600'
+                                    }`}>
+                                      {rec.gptScore > 0 ? rec.gptScore.toFixed(1) : '-'}
+                                    </span>
+                                  </div>
                                 </div>
-                              </div>
+                              ) : (
+                                /* 상세 데이터 없는 경우 - 요약 정보 표시 */
+                                <div className="bg-dark-800/30 rounded-lg p-2">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-xs">🔵</span>
+                                      <span className="text-xs">🟣</span>
+                                      <span className="text-xs">🟢</span>
+                                      <span className="text-xs text-dark-500 ml-1">AI 합산</span>
+                                    </div>
+                                    <div className="text-right">
+                                      <span className={`text-sm font-bold ${getScoreColor(rec.score)}`}>
+                                        {rec.score.toFixed(1)}점
+                                      </span>
+                                      <span className="text-xs text-dark-600 ml-1">평균</span>
+                                    </div>
+                                  </div>
+                                  <p className="text-[10px] text-dark-600 mt-1">
+                                    * 이전 버전 데이터로 AI별 상세 점수가 없습니다
+                                  </p>
+                                </div>
+                              )}
                               
                               {/* 가격 정보 */}
                               {rec.price && rec.price > 0 && (
