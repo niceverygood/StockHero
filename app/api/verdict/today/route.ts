@@ -17,6 +17,79 @@ const DAY_THEMES: Record<number, { name: string; emoji: string }> = {
   6: { name: '히든 젬', emoji: '🌟' },
 };
 
+// AI별 상세 의견 생성
+function generateDetailedSummary(top5: any[], claudeTop5: any[], geminiTop5: any[], gptTop5: any[], theme: any): string {
+  const unanimousCount = top5.filter(t => t.isUnanimous).length;
+  const topStock = top5[0];
+  
+  let summary = `${theme.emoji} 오늘의 테마: ${theme.name}\n\n`;
+  
+  // 전체 합의 현황
+  if (unanimousCount === 0) {
+    summary += `⚠️ 오늘은 만장일치 종목이 없습니다. AI들의 의견이 다양하게 갈렸습니다.\n\n`;
+  } else if (unanimousCount === top5.length) {
+    summary += `✅ 모든 종목이 만장일치! AI 3인이 완벽하게 의견을 모았습니다.\n\n`;
+  } else {
+    summary += `📊 ${unanimousCount}개 종목 만장일치, ${top5.length - unanimousCount}개 종목은 의견 차이가 있습니다.\n\n`;
+  }
+  
+  // 1위 종목 상세 분석
+  if (topStock) {
+    summary += `🥇 1위 ${topStock.name}(${topStock.symbol}) - 평균 ${topStock.avgScore.toFixed(1)}점\n`;
+    
+    // 각 AI 점수 분석
+    const scores = [
+      { name: '클로드', score: topStock.claudeScore, emoji: '🔵' },
+      { name: '제미나인', score: topStock.geminiScore, emoji: '🟣' },
+      { name: '지피테일러', score: topStock.gptScore, emoji: '🟢' },
+    ];
+    
+    scores.forEach(ai => {
+      if (ai.score === 0) {
+        summary += `${ai.emoji} ${ai.name}: 미선정 (Top 5에 포함시키지 않음)\n`;
+      } else {
+        summary += `${ai.emoji} ${ai.name}: ${ai.score.toFixed(1)}점\n`;
+      }
+    });
+    
+    // 의견 차이 분석
+    const maxScore = Math.max(topStock.claudeScore, topStock.geminiScore, topStock.gptScore);
+    const minScore = Math.min(
+      topStock.claudeScore || 999, 
+      topStock.geminiScore || 999, 
+      topStock.gptScore || 999
+    );
+    
+    if (minScore === 999 || minScore === 0) {
+      const missingAIs = scores.filter(ai => ai.score === 0).map(ai => ai.name);
+      summary += `\n💡 ${missingAIs.join(', ')}은(는) 오늘 테마인 "${theme.name}"에 더 적합한 다른 종목을 추천했습니다.`;
+    } else if (maxScore - minScore > 1.5) {
+      summary += `\n💡 AI들 간 점수 차이가 큽니다 (${minScore.toFixed(1)}~${maxScore.toFixed(1)}점). 신중한 판단이 필요합니다.`;
+    }
+  }
+  
+  return summary;
+}
+
+// AI별 개별 의견 추출
+function extractAIReasons(top5: any[], claudeTop5: any[], geminiTop5: any[], gptTop5: any[]) {
+  const aiReasons: Record<string, { claude: string | null; gemini: string | null; gpt: string | null }> = {};
+  
+  top5.forEach(stock => {
+    const claudeItem = claudeTop5?.find((c: any) => c.symbol === stock.symbol);
+    const geminiItem = geminiTop5?.find((g: any) => g.symbol === stock.symbol);
+    const gptItem = gptTop5?.find((g: any) => g.symbol === stock.symbol);
+    
+    aiReasons[stock.symbol] = {
+      claude: claudeItem?.reason || null,
+      gemini: geminiItem?.reason || null,
+      gpt: gptItem?.reason || null,
+    };
+  });
+  
+  return aiReasons;
+}
+
 export async function GET() {
   try {
     // 한국 시간 기준 오늘 날짜
@@ -27,7 +100,7 @@ export async function GET() {
     const dayOfWeek = kstTime.getDay();
     const theme = DAY_THEMES[dayOfWeek];
 
-    // DB에서 오늘의 verdict 조회
+    // DB에서 오늘의 verdict 조회 (각 AI별 Top5 포함)
     const { data: verdict, error } = await supabase
       .from('verdicts')
       .select('*')
@@ -42,6 +115,11 @@ export async function GET() {
       });
     }
 
+    // 각 AI별 Top5 데이터
+    const claudeTop5 = verdict.claude_top5 || [];
+    const geminiTop5 = verdict.gemini_top5 || [];
+    const gptTop5 = verdict.gpt_top5 || [];
+
     // 데이터 포맷팅
     const top5 = (verdict.top5 || []).map((item: any, idx: number) => ({
       rank: item.rank || idx + 1,
@@ -53,7 +131,14 @@ export async function GET() {
       gptScore: item.gptScore || 0,
       isUnanimous: item.isUnanimous || false,
       reason: item.reason || '',
+      reasons: item.reasons || [],
     }));
+
+    // AI별 상세 의견 추출
+    const aiReasons = extractAIReasons(top5, claudeTop5, geminiTop5, gptTop5);
+
+    // 상세 합의 의견 생성
+    const detailedSummary = generateDetailedSummary(top5, claudeTop5, geminiTop5, gptTop5, theme);
 
     return NextResponse.json({
       success: true,
@@ -61,7 +146,11 @@ export async function GET() {
         date: verdict.date,
         theme: theme,
         top5: top5,
-        consensusSummary: verdict.consensus_summary || '',
+        consensusSummary: detailedSummary,
+        aiReasons: aiReasons,
+        claudeTop5: claudeTop5,
+        geminiTop5: geminiTop5,
+        gptTop5: gptTop5,
       },
     });
 
