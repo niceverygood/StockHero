@@ -22,7 +22,7 @@ import {
   BarChart3Icon,
   LockIcon,
   UsersIcon,
-  FireIcon,
+  FlameIcon,
   StarIcon,
   ArrowUpIcon,
   ZapIcon,
@@ -133,7 +133,7 @@ function MissedProfitCalculator({ avgReturn }: { avgReturn: number }) {
   return (
     <div className="bg-gradient-to-br from-red-500/10 to-orange-500/5 border border-red-500/30 rounded-2xl p-6">
       <div className="flex items-center gap-2 mb-4">
-        <FireIcon className="w-6 h-6 text-red-400" />
+        <FlameIcon className="w-6 h-6 text-red-400" />
         <h3 className="text-lg font-bold text-dark-100">놓친 수익 계산기</h3>
       </div>
       
