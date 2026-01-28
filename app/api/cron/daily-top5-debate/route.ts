@@ -413,10 +413,7 @@ function deriveConsensus(rounds: DebateRound[]): { top5: any[]; individualPicks:
         ? data.scores.reduce((a, b) => a + b, 0) / data.scores.length 
         : 0;
       
-      // 실제 만장일치 여부: 3명 모두 선택했는지
-      const isUnanimous = data.selectedBy.size >= 3;
-      
-      // 개별 AI 점수 계산
+      // 개별 AI 점수 계산 (먼저 계산)
       const claudeScore = individualPicks.claude.includes(symbol) 
         ? 5 - individualPicks.claude.indexOf(symbol) 
         : 0;
@@ -426,6 +423,9 @@ function deriveConsensus(rounds: DebateRound[]): { top5: any[]; individualPicks:
       const gptScore = individualPicks.gpt.includes(symbol) 
         ? 5 - individualPicks.gpt.indexOf(symbol) 
         : 0;
+      
+      // 실제 만장일치 여부: 3명 모두 Top 5에 선정했는지 (점수 > 0)
+      const isUnanimous = claudeScore > 0 && geminiScore > 0 && gptScore > 0;
       
       return {
         symbol,
