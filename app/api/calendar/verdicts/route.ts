@@ -140,8 +140,15 @@ export async function GET(request: NextRequest) {
     // 필요한 필드만 최소한으로 선택 (성능 최적화)
     const supabase = getSupabase();
     
+    // DB verdict 타입 정의
+    interface DBVerdict {
+      date: string;
+      top5: any[];
+      consensus_summary?: string;
+    }
+
     // 기본 쿼리 (debate_log 컬럼이 없을 수 있음)
-    const { data: dbVerdicts, error } = await supabase
+    const { data, error } = await supabase
       .from('verdicts')
       .select('date, top5, consensus_summary')
       .gte('date', startDate)
@@ -156,6 +163,8 @@ export async function GET(request: NextRequest) {
         message: 'AI 분석 데이터가 없습니다. 오늘의 분석을 생성해주세요.',
       });
     }
+    
+    const dbVerdicts = (data || []) as DBVerdict[];
 
     // 요일별 테마 정보
     const DAY_THEMES: Record<number, { name: string; emoji: string }> = {
@@ -169,7 +178,7 @@ export async function GET(request: NextRequest) {
     };
 
     // Convert to calendar format with theme info
-    const calendarVerdicts = (dbVerdicts || []).map(dbVerdict => {
+    const calendarVerdicts = dbVerdicts.map((dbVerdict: DBVerdict) => {
       const dateObj = new Date(dbVerdict.date);
       const dayOfWeek = dateObj.getDay();
       const theme = DAY_THEMES[dayOfWeek];
