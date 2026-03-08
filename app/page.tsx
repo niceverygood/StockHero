@@ -8,6 +8,7 @@ import { CharacterDetailModal } from '@/components/CharacterDetailModal';
 import { PerformanceTeaser } from '@/components/PerformanceTeaser';
 import { useCurrentPlan, useSubscription } from '@/lib/subscription/hooks';
 import { SparklesIcon, X, TrendingUp, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Calendar } from '@/components';
 
 const AI_EMOJIS: Record<string, string> = {
   claude: '🔵',
@@ -318,6 +319,14 @@ export default function HomePage() {
                     </div>
                   </button>
                 ))}
+              </div>
+
+              {/* Calendar */}
+              <div className="max-w-3xl mx-auto mt-10">
+                <h2 className="text-xl font-bold text-dark-100 mb-4 flex items-center gap-2">
+                  📅 일별 추천 달력
+                </h2>
+                <Calendar />
               </div>
 
               {/* Consensus Summary */}
