@@ -4,23 +4,15 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { UserMenu } from './UserMenu';
-import { useCurrentPlan } from '@/lib/subscription/hooks';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { isAdmin } from '@/lib/admin/config';
-import { SparklesIcon, Menu, X, ShieldCheckIcon } from 'lucide-react';
+import { Menu, X, ShieldCheckIcon } from 'lucide-react';
 
 const NAV_LINKS: { href: string; label: string; icon: string }[] = [
   { href: '/', label: '메인', icon: '🏠' },
   { href: '/consult', label: 'AI 상담', icon: '💬' },
 ];
 
-// 플랜별 배지 스타일
-const PLAN_BADGE_STYLES = {
-  free: { label: '무료', bg: 'bg-dark-700', text: 'text-dark-300', border: '' },
-  basic: { label: 'BASIC', bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border border-blue-500/30' },
-  pro: { label: 'PRO', bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border border-purple-500/30' },
-  vip: { label: 'VIP', bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border border-amber-500/30 ring-1 ring-amber-500/20' },
-};
 
 export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -29,10 +21,6 @@ export function Header() {
   
   // 관리자 여부 확인
   const userIsAdmin = isAdmin(user?.email);
-  
-  // 구독 정보
-  const { planName, isPremium, isLoading: planLoading } = useCurrentPlan();
-  const planBadge = PLAN_BADGE_STYLES[planName as keyof typeof PLAN_BADGE_STYLES] || PLAN_BADGE_STYLES.free;
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
@@ -87,14 +75,6 @@ export function Header() {
               )}
               
               <div className="ml-2 xl:ml-4 pl-2 xl:pl-4 border-l border-dark-700 flex items-center gap-2 xl:gap-3">
-                {/* 플랜 배지 */}
-                {!planLoading && (
-                  <div className={`px-2 py-1 rounded-full text-xs font-medium ${planBadge.bg} ${planBadge.text} ${planBadge.border} flex items-center gap-1 whitespace-nowrap`}>
-                    {planName === 'pro' && <SparklesIcon className="w-3 h-3" />}
-                    {planBadge.label}
-                  </div>
-                )}
-                
                 <UserMenu />
               </div>
             </div>
@@ -153,15 +133,6 @@ export function Header() {
                 )}
               </div>
               
-              {/* 모바일 플랜 배지 */}
-              {!planLoading && (
-                <div className="mt-3 flex justify-center">
-                  <div className={`px-3 py-1.5 rounded-full text-xs font-medium ${planBadge.bg} ${planBadge.text} ${planBadge.border} flex items-center gap-1 whitespace-nowrap`}>
-                    {planName === 'pro' && <SparklesIcon className="w-3 h-3" />}
-                    <span>{planBadge.label}</span>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </nav>

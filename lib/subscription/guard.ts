@@ -135,97 +135,16 @@ function createUsageLimitResponse(
 /**
  * 사용자 구독 정보 조회
  */
-export async function getSubscriptionInfo(request: NextRequest): Promise<SubscriptionInfo | null> {
-  try {
-    const supabase = getSupabase();
-    
-    // Authorization 헤더에서 토큰 추출
-    const authHeader = request.headers.get('Authorization');
-    let userId: string | null = null;
-
-    if (supabase && authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.substring(7);
-      const { data: { user } } = await supabase.auth.getUser(token);
-      userId = user?.id || null;
-    }
-
-    // 쿠키에서 세션 확인
-    if (!userId && supabase) {
-      const cookieHeader = request.headers.get('cookie');
-      if (cookieHeader) {
-        // Supabase 세션 쿠키 파싱 (간소화)
-        const match = cookieHeader.match(/sb-[^=]+-auth-token=([^;]+)/);
-        if (match) {
-          try {
-            const tokenData = JSON.parse(decodeURIComponent(match[1]));
-            if (tokenData?.access_token) {
-              const { data: { user } } = await supabase.auth.getUser(tokenData.access_token);
-              userId = user?.id || null;
-            }
-          } catch {}
-        }
-      }
-    }
-
-    if (!userId) {
-      // 비로그인 사용자 = 무료 플랜
-      return {
-        userId: 'anonymous',
-        planName: 'free',
-        planId: null,
-        limits: PLAN_LIMITS.free,
-        isActive: true,
-        periodEnd: null,
-      };
-    }
-
-    // supabase가 없으면 무료 플랜 반환
-    if (!supabase) {
-      return {
-        userId,
-        planName: 'free',
-        planId: null,
-        limits: PLAN_LIMITS.free,
-        isActive: true,
-        periodEnd: null,
-      };
-    }
-
-    // 구독 정보 조회
-    const { data: subscription } = await supabase
-      .from('user_subscriptions')
-      .select('*, plan:subscription_plans(*)')
-      .eq('user_id', userId)
-      .in('status', ['active', 'trial'])
-      .gt('current_period_end', new Date().toISOString())
-      .single();
-
-    if (!subscription) {
-      return {
-        userId,
-        planName: 'free',
-        planId: null,
-        limits: PLAN_LIMITS.free,
-        isActive: true,
-        periodEnd: null,
-      };
-    }
-
-    const planName = (subscription.plan?.name || 'free') as PlanName;
-
-    return {
-      userId,
-      planName,
-      planId: subscription.plan_id,
-      limits: PLAN_LIMITS[planName] || PLAN_LIMITS.free,
-      isActive: subscription.status === 'active' || subscription.status === 'trial',
-      periodEnd: subscription.current_period_end,
-    };
-
-  } catch (error) {
-    console.error('Failed to get subscription info:', error);
-    return null;
-  }
+export async function getSubscriptionInfo(_request: NextRequest): Promise<SubscriptionInfo | null> {
+  // 구독 기능 비활성화 - 모든 사용자 무제한
+  return {
+    userId: 'free-mode',
+    planName: 'vip',
+    planId: null,
+    limits: PLAN_LIMITS.vip,
+    isActive: true,
+    periodEnd: null,
+  };
 }
 
 /**

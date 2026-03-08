@@ -24,7 +24,7 @@ import {
 // =====================================================
 // 🆓 무료 모드 설정 - 모든 기능 활성화
 // =====================================================
-const FREE_MODE = false; // true면 모든 기능 무료 이용 가능
+const FREE_MODE = true; // true면 모든 기능 무료 이용 가능
 
 // Pro 플랜으로 설정 (모든 기능 활성화)
 const DEFAULT_PRO_PLAN: SubscriptionPlan = {
