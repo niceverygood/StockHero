@@ -1,9 +1,8 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import OpenAI from 'openai';
-import Anthropic from '@anthropic-ai/sdk';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { fetchMultipleStockPrices } from '@/lib/market-data/kis';
+import { callOpenRouterCompletion, VERDICT_MODELS } from '@/lib/llm/openrouter-verdict';
 
 // Supabase Admin Client
 const supabase = createClient(
@@ -11,10 +10,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// AI Clients
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '');
+export type VerdictSlot = 'morning' | 'noon';
 
 // ===== 확장된 분석 대상 종목 (40개 이상) =====
 const ANALYSIS_STOCKS = [
@@ -161,14 +157,26 @@ function filterStocksByTheme(theme: DayTheme): typeof ANALYSIS_STOCKS {
   return filtered;
 }
 
-// Claude 분석
+// OpenRouter 공통: JSON top5 파싱
+function parseTop5FromResponse(text: string): any[] {
+  const jsonMatch = text?.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return [];
+  try {
+    const parsed = JSON.parse(jsonMatch[0]);
+    return Array.isArray(parsed?.top5) ? parsed.top5 : [];
+  } catch {
+    return [];
+  }
+}
+
+// Claude (Opus 4) 분석
 async function analyzeWithClaude(stocks: typeof ANALYSIS_STOCKS, realPrices: Map<string, any>, theme: DayTheme): Promise<any[]> {
   const stockList = stocks.map(s => {
     const realPrice = realPrices.get(s.symbol);
     return `${s.name}(${s.symbol}): 현재가 ${realPrice?.price?.toLocaleString() || 'N/A'}원, PER ${s.per}, PBR ${s.pbr}, ROE ${s.roe}%, 배당 ${s.dividend}%, 성장률 ${s.growth}%, 테마: ${s.theme?.join(', ') || s.sector}`;
   }).join('\n');
 
-  const prompt = `당신은 펀더멘털 분석가입니다. 
+  const userPrompt = `당신은 펀더멘털 분석가입니다. 
   
 오늘의 테마: ${theme.emoji} ${theme.name}
 
@@ -177,20 +185,18 @@ ${theme.claudePrompt} 아래 종목들 중 Top 5를 선정하세요.
 종목 목록:
 ${stockList}
 
-JSON 형식으로 응답:
+JSON 형식으로만 응답:
 {"top5":[{"rank":1,"symbol":"코드","name":"종목명","score":4.5,"reason":"분석이유"}]}`;
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2048,
-      messages: [{ role: 'user', content: prompt }],
-    });
-    const text = response.content.find(b => b.type === 'text');
-    const jsonMatch = (text as any)?.text?.match(/\{[\s\S]*\}/);
-    if (jsonMatch) return JSON.parse(jsonMatch[0]).top5;
+    const text = await callOpenRouterCompletion(
+      VERDICT_MODELS.claude,
+      [{ role: 'user', content: userPrompt }],
+      2048
+    );
+    return parseTop5FromResponse(text);
   } catch (error) {
-    console.error('Claude error:', error);
+    console.error('Claude (OpenRouter) error:', error);
   }
   return [];
 }
@@ -202,7 +208,7 @@ async function analyzeWithGemini(stocks: typeof ANALYSIS_STOCKS, realPrices: Map
     return `${s.name}(${s.symbol}): 현재가 ${realPrice?.price?.toLocaleString() || 'N/A'}원, 성장률 ${s.growth}%, 섹터: ${s.sector}, 테마: ${s.theme?.join(', ') || '-'}`;
   }).join('\n');
 
-  const prompt = `당신은 성장주 전문 투자자입니다.
+  const userPrompt = `당신은 성장주 전문 투자자입니다.
 
 오늘의 테마: ${theme.emoji} ${theme.name}
 
@@ -211,17 +217,18 @@ ${theme.geminiPrompt} 아래 종목들 중 Top 5를 선정하세요.
 종목 목록:
 ${stockList}
 
-JSON 형식으로 응답:
+JSON 형식으로만 응답:
 {"top5":[{"rank":1,"symbol":"코드","name":"종목명","score":4.8,"reason":"분석이유"}]}`;
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) return JSON.parse(jsonMatch[0]).top5;
+    const text = await callOpenRouterCompletion(
+      VERDICT_MODELS.gemini,
+      [{ role: 'user', content: userPrompt }],
+      2048
+    );
+    return parseTop5FromResponse(text);
   } catch (error) {
-    console.error('Gemini error:', error);
+    console.error('Gemini (OpenRouter) error:', error);
   }
   return [];
 }
@@ -233,7 +240,7 @@ async function analyzeWithGPT(stocks: typeof ANALYSIS_STOCKS, realPrices: Map<st
     return `${s.name}(${s.symbol}): 현재가 ${realPrice?.price?.toLocaleString() || 'N/A'}원, 배당 ${s.dividend}%, PER ${s.per}, 섹터: ${s.sector}`;
   }).join('\n');
 
-  const prompt = `당신은 안정성을 중시하는 투자 전문가입니다.
+  const userPrompt = `당신은 안정성을 중시하는 투자 전문가입니다.
 
 오늘의 테마: ${theme.emoji} ${theme.name}
 
@@ -242,20 +249,18 @@ ${theme.gptPrompt} 아래 종목들 중 Top 5를 선정하세요.
 종목 목록:
 ${stockList}
 
-JSON 형식으로 응답:
+JSON 형식으로만 응답:
 {"top5":[{"rank":1,"symbol":"코드","name":"종목명","score":4.2,"reason":"분석이유"}]}`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 2048,
-    });
-    const text = response.choices[0]?.message?.content || '';
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) return JSON.parse(jsonMatch[0]).top5;
+    const text = await callOpenRouterCompletion(
+      VERDICT_MODELS.gpt,
+      [{ role: 'user', content: userPrompt }],
+      2048
+    );
+    return parseTop5FromResponse(text);
   } catch (error) {
-    console.error('GPT error:', error);
+    console.error('GPT (OpenRouter) error:', error);
   }
   return [];
 }
@@ -338,6 +343,16 @@ function aggregateTop5(claudeTop5: any[], geminiTop5: any[], gptTop5: any[], rea
   return aggregated;
 }
 
+// KST 기준 현재 시각에서 slot 결정 (8시→morning, 12시→noon)
+function getSlotFromKST(): VerdictSlot {
+  const now = new Date();
+  const kstOffset = 9 * 60;
+  const kstTime = new Date(now.getTime() + (kstOffset + now.getTimezoneOffset()) * 60 * 1000);
+  const hour = kstTime.getHours();
+  if (hour >= 11 && hour < 14) return 'noon';
+  return 'morning';
+}
+
 export async function GET(request: NextRequest) {
   // Verify cron secret (for security in production)
   const authHeader = request.headers.get('authorization');
@@ -348,56 +363,62 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // URL 파라미터에서 date 확인 (과거 날짜 생성용)
+  // OpenRouter API 키 확인
+  if (!process.env.OPENROUTER_API_KEY) {
+    return NextResponse.json(
+      { success: false, error: 'OPENROUTER_API_KEY is not configured. .env에 설정하세요.' },
+      { status: 500 }
+    );
+  }
+
+  // URL 파라미터: date, slot(morning|noon), force
   const { searchParams } = new URL(request.url);
   const customDate = searchParams.get('date');
+  const slotParam = searchParams.get('slot') as VerdictSlot | null;
+  const slot: VerdictSlot = slotParam === 'noon' || slotParam === 'morning' ? slotParam : getSlotFromKST();
   
   let today: string;
   let dateForTheme: Date;
   
   if (customDate && /^\d{4}-\d{2}-\d{2}$/.test(customDate)) {
-    // 커스텀 날짜 사용
     today = customDate;
     dateForTheme = new Date(customDate + 'T00:00:00+09:00');
   } else {
-    // 한국 시간 기준 오늘 날짜
     const now = new Date();
-    const kstOffset = 9 * 60; // UTC+9
+    const kstOffset = 9 * 60;
     const kstTime = new Date(now.getTime() + (kstOffset + now.getTimezoneOffset()) * 60 * 1000);
     today = kstTime.toISOString().split('T')[0];
     dateForTheme = kstTime;
   }
   
-  // 해당 날짜의 테마 결정
   const todayTheme = getTodayTheme(dateForTheme);
-  console.log(`[${today}] Starting daily verdict generation...`);
+  console.log(`[${today}] [${slot}] Starting daily verdict generation...`);
   console.log(`[${today}] Today's theme: ${todayTheme.emoji} ${todayTheme.name}`);
 
-  // force 파라미터 확인 (기존 데이터 삭제 후 재생성)
   const force = searchParams.get('force') === 'true';
 
   try {
-    // 1. 오늘 이미 생성된 verdict가 있는지 확인
+    // 1. 해당 날짜+slot에 이미 생성된 verdict가 있는지 확인
     const { data: existingVerdict } = await supabase
       .from('verdicts')
       .select('*')
       .eq('date', today)
-      .single();
+      .eq('slot', slot)
+      .maybeSingle();
 
     if (existingVerdict && !force) {
-      console.log(`[${today}] Verdict already exists for today`);
+      console.log(`[${today}] [${slot}] Verdict already exists`);
       return NextResponse.json({ 
         success: true, 
-        message: 'Verdict already exists for today',
+        message: `Verdict already exists for ${today} (${slot})`,
         verdict: existingVerdict 
       });
     }
 
-    // force가 true면 기존 데이터 삭제
     if (existingVerdict && force) {
-      console.log(`[${today}] Force regeneration - deleting existing verdict...`);
-      await supabase.from('verdicts').delete().eq('date', today);
-      await supabase.from('predictions').delete().eq('date', today);
+      console.log(`[${today}] [${slot}] Force regeneration - deleting existing...`);
+      await supabase.from('verdicts').delete().eq('date', today).eq('slot', slot);
+      // predictions는 verdict_id CASCADE로 자동 삭제됨
     }
 
     // 2. 테마에 맞는 종목 필터링
@@ -460,21 +481,15 @@ export async function GET(request: NextRequest) {
       reason: item.reason || '',
     }));
 
-    // 먼저 기본 컬럼만으로 INSERT 시도
     const insertData: any = {
       date: today,
+      slot: slot,
       top5: top5,
       consensus_summary: consensusSummary,
+      claude_top5: claudeTop5WithInfo,
+      gemini_top5: geminiTop5WithInfo,
+      gpt_top5: gptTop5WithInfo,
     };
-    
-    // 새 컬럼이 있으면 추가 (없어도 에러 안남)
-    try {
-      insertData.claude_top5 = claudeTop5WithInfo;
-      insertData.gemini_top5 = geminiTop5WithInfo;
-      insertData.gpt_top5 = gptTop5WithInfo;
-    } catch (e) {
-      console.log('New columns not available, skipping...');
-    }
 
     const { data: verdict, error } = await supabase
       .from('verdicts')

@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -137,23 +138,23 @@ export async function GET(request: NextRequest) {
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
 
-    // 필요한 필드만 최소한으로 선택 (성능 최적화)
     const supabase = getSupabase();
     
-    // DB verdict 타입 정의
     interface DBVerdict {
       date: string;
+      slot?: string;
       top5: any[];
       consensus_summary?: string;
     }
 
-    // 기본 쿼리 (debate_log 컬럼이 없을 수 있음)
+    // date + slot 별로 행 조회 (오전 8시·정오 두 시점). 마이그레이션 010 필요
     const { data, error } = await supabase
       .from('verdicts')
-      .select('date, top5, consensus_summary')
+      .select('date, slot, top5, consensus_summary')
       .gte('date', startDate)
       .lte('date', endDate)
-      .order('date', { ascending: true });
+      .order('date', { ascending: true })
+      .order('slot', { ascending: true });
 
     if (error) {
       console.error('Supabase query error:', error);
@@ -177,14 +178,14 @@ export async function GET(request: NextRequest) {
       6: { name: '히든 젬', emoji: '🌟' },
     };
 
-    // Convert to calendar format with theme info
+    // Convert to calendar format (날짜당 최대 2건: morning, noon)
     const calendarVerdicts = dbVerdicts.map((dbVerdict: DBVerdict) => {
       const dateObj = new Date(dbVerdict.date);
       const dayOfWeek = dateObj.getDay();
       const theme = DAY_THEMES[dayOfWeek];
       const v = convertDBVerdictToCalendarFormat(dbVerdict);
+      const slot = (dbVerdict as any).slot ?? 'morning';
       
-      // top5에서 votes 정보로 만장일치 여부 판단
       const top5Data = v.top5.map((item: any) => {
         const originalItem = (dbVerdict.top5 || []).find((t: any) => t.symbol === item.symbolCode);
         return {
@@ -203,6 +204,7 @@ export async function GET(request: NextRequest) {
       
       return {
         date: v.date,
+        slot,
         theme: theme,
         top5: top5Data,
         consensusSummary: (dbVerdict as any).consensus_summary || '',

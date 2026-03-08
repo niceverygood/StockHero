@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 // 구독 정보 조회 API
 
 import { NextResponse } from 'next/server';

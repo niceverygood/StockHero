@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 /**
  * AI 3대장 verdict 최근 생성 이력 (관리자 전용)
  * - 크론이 매일 새로 생성하는지, 같은 결과만 나오는 원인 확인용

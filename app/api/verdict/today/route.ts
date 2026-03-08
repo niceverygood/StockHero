@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -100,14 +101,14 @@ export async function GET() {
     const dayOfWeek = kstTime.getDay();
     const theme = DAY_THEMES[dayOfWeek];
 
-    // DB에서 오늘의 verdict 조회 (각 AI별 Top5 포함)
-    const { data: verdict, error } = await supabase
+    // DB에서 오늘의 verdict 조회 (오전 8시·정오 모두, slot 컬럼 있으면 사용)
+    const { data: verdictsRows, error } = await supabase
       .from('verdicts')
       .select('*')
       .eq('date', today)
-      .single();
+      .order('slot', { ascending: false }); // noon 먼저
 
-    if (error || !verdict) {
+    if (error || !verdictsRows?.length) {
       return NextResponse.json({
         success: true,
         verdict: null,
@@ -115,7 +116,11 @@ export async function GET() {
       });
     }
 
-    // 각 AI별 Top5 데이터
+    // 최신 slot 우선 (정오 → 오전 8시). slot 컬럼 없으면 첫 행 사용
+    const verdict = verdictsRows[0];
+    const slot = (verdict as any).slot ?? 'morning';
+    const slotsAvailable = verdictsRows.map((r: any) => r.slot || 'morning');
+
     const claudeTop5 = verdict.claude_top5 || [];
     const geminiTop5 = verdict.gemini_top5 || [];
     const gptTop5 = verdict.gpt_top5 || [];
@@ -144,6 +149,8 @@ export async function GET() {
       success: true,
       verdict: {
         date: verdict.date,
+        slot,
+        slotsAvailable,
         theme: theme,
         top5: top5,
         consensusSummary: detailedSummary,

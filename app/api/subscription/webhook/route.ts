@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 // 포트원 웹훅 API - 결제 상태 변경 알림 수신
 
 import { NextResponse } from 'next/server';

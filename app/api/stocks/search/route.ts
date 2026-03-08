@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { KRX_ALL_STOCKS, KRX_SECTORS, searchStocksByName, isValidStockSymbol } from '@/lib/data/krx-stocks';
 import { 

@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getNaverStockPrice, getStockInfoByCode } from '@/lib/external/stock-search';
 import { findStockBySymbol } from '@/lib/data/krx-stocks';

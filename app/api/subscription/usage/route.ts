@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 // 기능 사용량 조회 및 체크 API
 
 import { NextResponse } from 'next/server';

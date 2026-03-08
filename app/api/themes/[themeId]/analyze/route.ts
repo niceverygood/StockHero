@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { HOT_THEMES, HotTheme, ThemeStock } from '@/lib/data/hot-themes';
 import { fetchMultipleYahooUSStocks } from '@/lib/market-data/yahoo';

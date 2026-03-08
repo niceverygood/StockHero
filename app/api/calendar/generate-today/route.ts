@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { DebateOrchestrator } from '@/lib/llm';
 import type { CharacterType } from '@/lib/llm';

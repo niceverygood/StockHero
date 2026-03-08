@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchUSStockPrice, fetchMultipleUSStockPrices } from '@/lib/market-data/kis';
 import { fetchYahooUSStockPrice, fetchMultipleYahooUSStocks } from '@/lib/market-data/yahoo';

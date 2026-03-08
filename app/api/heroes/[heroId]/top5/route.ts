@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchMultipleStockPrices } from '@/lib/market-data/kis';
 import { fetchMultipleNaverPrices } from '@/lib/market-data/naver';

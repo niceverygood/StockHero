@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { KISMarketDataProvider, fetchMultipleStockPrices } from '@/lib/market-data/kis';
 import { KiwoomMarketDataProvider, fetchMultipleKiwoomPrices } from '@/lib/market-data/kiwoom';

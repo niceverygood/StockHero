@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { HOT_THEMES } from '@/lib/data/hot-themes';
 

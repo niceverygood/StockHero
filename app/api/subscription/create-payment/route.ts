@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 // 결제 생성 API - 포트원 결제를 위한 설정 생성
 
 import { NextResponse } from 'next/server';
