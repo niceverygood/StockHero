@@ -10,16 +10,16 @@ import { getMinimumFutureDate, validateAndCorrectTargetDate } from './analysis-f
 
 // OpenRouter 최신 모델 (2026년 3월)
 const MODEL_MAP: Record<CharacterType, string> = {
-  claude: 'anthropic/claude-opus-4-5',           // Claude Opus 4.5
-  gemini: 'google/gemini-3',                     // Gemini 3
-  gpt: 'openai/gpt-5.4',                         // GPT 5.4
+  claude: 'anthropic/claude-opus-4-6',           // Claude Opus 4.6 (2026.02)
+  gemini: 'google/gemini-3.1-pro-preview',       // Gemini 3.1 Pro Preview (2026.02)
+  gpt: 'openai/gpt-5.4-pro',                     // GPT-5.4 Pro (2026.03)
 };
 
 // 대체 모델 (rate limit이나 에러 시)
 const FALLBACK_MODEL_MAP: Record<CharacterType, string> = {
-  claude: 'anthropic/claude-sonnet-4-5',         // Claude Sonnet 4.5
+  claude: 'anthropic/claude-opus-4-5',           // Claude Opus 4.5
   gemini: 'google/gemini-2.5-pro',               // Gemini 2.5 Pro
-  gpt: 'openai/gpt-4o',                          // GPT-4o
+  gpt: 'openai/gpt-5.4',                         // GPT-5.4
 };
 
 interface OpenRouterMessage {
