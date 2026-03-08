@@ -20,13 +20,18 @@ interface Top5Item {
 
 interface DayVerdict {
   date: string;
+  slot?: 'morning' | 'noon';
   theme: { name: string; emoji: string };
   top5: Top5Item[];
   consensusSummary: string;
 }
 
+/** 날짜별 오전 8시 / 정오 추천 (둘 다 있을 수 있음) */
+type DayVerdictsBySlot = Record<string, { morning?: DayVerdict; noon?: DayVerdict }>;
+
 interface RecommendationRecord {
   date: string;
+  slot?: 'morning' | 'noon';
   rank: number;
   score: number;
   price?: number;
@@ -61,13 +66,12 @@ interface PriceData {
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
-// 캐시 (메모리 기반)
-const verdictCache = new Map<string, { data: Record<string, DayVerdict>; timestamp: number }>();
+const verdictCache = new Map<string, { data: DayVerdictsBySlot; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5분
 
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [verdicts, setVerdicts] = useState<Record<string, DayVerdict>>({});
+  const [verdicts, setVerdicts] = useState<DayVerdictsBySlot>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedStock, setSelectedStock] = useState<StockHistory | null>(null);
   const [stockPrices, setStockPrices] = useState<Record<string, PriceData>>({});
@@ -131,13 +135,13 @@ export default function CalendarPage() {
       const data = await res.json();
       
       if (data.success && data.verdicts) {
-        const verdictMap: Record<string, DayVerdict> = {};
+        const verdictMap: DayVerdictsBySlot = {};
         data.verdicts.forEach((v: any) => {
-          verdictMap[v.date] = v;
+          const slot = v.slot === 'noon' ? 'noon' : 'morning';
+          if (!verdictMap[v.date]) verdictMap[v.date] = {};
+          verdictMap[v.date][slot] = { ...v, slot };
         });
         setVerdicts(verdictMap);
-        
-        // 캐시 저장
         verdictCache.set(cacheKey, { data: verdictMap, timestamp: Date.now() });
       }
     } catch (error) {
@@ -147,56 +151,58 @@ export default function CalendarPage() {
     }
   }, [year, month]);
 
-  // 종목별 추천 이력 분석
+  // 종목별 추천 이력 분석 (오전 8시·정오 모두 반영)
   const stockHistories = useMemo(() => {
     const histories: Record<string, StockHistory> = {};
     const sortedDates = Object.keys(verdicts).sort();
 
     sortedDates.forEach(date => {
-      const verdict = verdicts[date];
-      verdict.top5.forEach(stock => {
-        // price는 currentPrice 또는 price 중 하나 사용
-        const stockPrice = stock.currentPrice || stock.price;
-        
-        // AI별 점수 및 만장일치 계산
-        const claudeScore = stock.claudeScore || 0;
-        const geminiScore = stock.geminiScore || 0;
-        const gptScore = stock.gptScore || 0;
-        const votedCount = [claudeScore, geminiScore, gptScore].filter(s => s > 0).length;
-        const isUnanimous = stock.isUnanimous || votedCount === 3;
-        
-        if (!histories[stock.symbol]) {
-          histories[stock.symbol] = {
-            symbol: stock.symbol,
-            name: stock.name,
-            firstRecommendDate: date,
-            firstRecommendPrice: stockPrice,
-            totalDays: 0,
-            currentStreak: 0,
-            recommendations: [],
-            unanimousDays: 0,
-            claudeVotes: 0,
-            geminiVotes: 0,
-            gptVotes: 0,
-          };
-        }
-        
-        histories[stock.symbol].totalDays++;
-        if (isUnanimous) histories[stock.symbol].unanimousDays++;
-        if (claudeScore > 0) histories[stock.symbol].claudeVotes++;
-        if (geminiScore > 0) histories[stock.symbol].geminiVotes++;
-        if (gptScore > 0) histories[stock.symbol].gptVotes++;
-        
-        histories[stock.symbol].recommendations.push({
-          date,
-          rank: stock.rank,
-          score: stock.avgScore,
-          price: stockPrice,
-          claudeScore,
-          geminiScore,
-          gptScore,
-          isUnanimous,
-          votedCount,
+      const slots = verdicts[date];
+      (['morning', 'noon'] as const).forEach(slotKey => {
+        const verdict = slots[slotKey];
+        if (!verdict?.top5) return;
+        verdict.top5.forEach((stock: Top5Item) => {
+          const stockPrice = stock.currentPrice ?? stock.price;
+          const claudeScore = stock.claudeScore || 0;
+          const geminiScore = stock.geminiScore || 0;
+          const gptScore = stock.gptScore || 0;
+          const votedCount = [claudeScore, geminiScore, gptScore].filter(s => s > 0).length;
+          const isUnanimous = stock.isUnanimous || votedCount === 3;
+
+          if (!histories[stock.symbol]) {
+            histories[stock.symbol] = {
+              symbol: stock.symbol,
+              name: stock.name,
+              firstRecommendDate: date,
+              firstRecommendPrice: stockPrice,
+              totalDays: 0,
+              currentStreak: 0,
+              recommendations: [],
+              unanimousDays: 0,
+              claudeVotes: 0,
+              geminiVotes: 0,
+              gptVotes: 0,
+            };
+          }
+
+          histories[stock.symbol].totalDays++;
+          if (isUnanimous) histories[stock.symbol].unanimousDays++;
+          if (claudeScore > 0) histories[stock.symbol].claudeVotes++;
+          if (geminiScore > 0) histories[stock.symbol].geminiVotes++;
+          if (gptScore > 0) histories[stock.symbol].gptVotes++;
+
+          histories[stock.symbol].recommendations.push({
+            date,
+            slot: slotKey,
+            rank: stock.rank,
+            score: stock.avgScore,
+            price: stockPrice,
+            claudeScore,
+            geminiScore,
+            gptScore,
+            isUnanimous,
+            votedCount,
+          });
         });
       });
     });
@@ -328,7 +334,7 @@ export default function CalendarPage() {
     setSelectedStock(null);
   };
 
-  const selectedVerdict = selectedDate ? verdicts[selectedDate] : null;
+  const selectedSlots = selectedDate ? verdicts[selectedDate] : null;
 
   const getScoreColor = (score: number) => {
     if (score >= 4.5) return 'text-emerald-400';
@@ -435,12 +441,14 @@ export default function CalendarPage() {
                   }
 
                   const dateStr = formatDateString(day);
-                  const hasData = !!verdicts[dateStr];
+                  const daySlots = verdicts[dateStr];
+                  const hasData = !!daySlots && (!!daySlots.morning || !!daySlots.noon);
                   const isSelected = selectedDate === dateStr;
                   const dayOfWeek = new Date(year, month, day).getDay();
-                  
-                  // 만장일치가 있는 날인지 확인
-                  const hasUnanimous = hasData && verdicts[dateStr].top5.some(stock => stock.isUnanimous);
+                  const hasUnanimous = hasData && (
+                    (daySlots.morning?.top5.some(stock => stock.isUnanimous)) ||
+                    (daySlots.noon?.top5.some(stock => stock.isUnanimous))
+                  );
 
                   return (
                     <button
@@ -475,7 +483,7 @@ export default function CalendarPage() {
                       </span>
                       {hasData && (
                         <span className="text-xs mt-0.5">
-                          {verdicts[dateStr].theme.emoji}
+                          {(verdicts[dateStr].morning ?? verdicts[dateStr].noon)?.theme.emoji}
                         </span>
                       )}
                     </button>
@@ -827,82 +835,72 @@ export default function CalendarPage() {
                     </div>
                   </div>
                 </div>
-              ) : selectedVerdict ? (
-                // Day Detail View
+              ) : selectedSlots && selectedDate ? (
+                // Day Detail View (오전 8시 / 정오 두 시점 표시)
                 <div>
-                  {/* Date & Theme */}
-                  <div className="flex items-center gap-3 mb-6">
-                    <span className="text-3xl">{selectedVerdict.theme.emoji}</span>
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="text-3xl">{(selectedSlots.morning ?? selectedSlots.noon)?.theme.emoji ?? '📊'}</span>
                     <div>
-                      <p className="text-lg font-bold text-dark-100">{selectedVerdict.date}</p>
-                      <p className="text-sm text-dark-400">{selectedVerdict.theme.name}</p>
+                      <p className="text-lg font-bold text-dark-100">{selectedDate}</p>
+                      <p className="text-sm text-dark-400">{(selectedSlots.morning ?? selectedSlots.noon)?.theme.name}</p>
                     </div>
                   </div>
 
-                  {/* Top 5 List */}
-                  <div className="space-y-3">
-                    {selectedVerdict.top5.map((stock) => {
-                      const streakInfo = getStockStreakInfo(stock.symbol, selectedVerdict.date);
-                      const isFirstDay = streakInfo?.firstDate === selectedVerdict.date;
-                      
-                      return (
-                        <button
-                          key={stock.symbol}
-                          onClick={() => handleStockClick(stock.symbol)}
-                          className="w-full flex items-center gap-3 p-3 bg-dark-800/50 rounded-xl hover:bg-dark-800 transition-colors text-left"
-                        >
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm ${getRankBadge(stock.rank)}`}>
-                            {stock.rank}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium text-dark-100 truncate">{stock.name}</p>
-                              {isFirstDay && (
-                                <span className="px-1.5 py-0.5 text-[10px] bg-green-500/20 text-green-400 rounded font-medium">
-                                  NEW
-                                </span>
-                              )}
-                              {streakInfo && streakInfo.streak > 1 && (
-                                <span className="px-1.5 py-0.5 text-[10px] bg-amber-500/20 text-amber-400 rounded font-medium">
-                                  🔥 {streakInfo.streak}일 연속
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-dark-500">
-                              {stock.symbol}
-                              {streakInfo && streakInfo.totalDays > 1 && (
-                                <span className="ml-2 text-dark-600">
-                                  · 총 {streakInfo.totalDays}회 추천
-                                </span>
-                              )}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <div className={`text-lg font-bold ${getScoreColor(stock.avgScore)}`}>
-                              {stock.avgScore.toFixed(1)}
-                            </div>
-                          </div>
-                          <svg className="w-4 h-4 text-dark-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {(['morning', 'noon'] as const).map((slotKey) => {
+                    const v = selectedSlots[slotKey];
+                    if (!v?.top5?.length) return null;
+                    const slotLabel = slotKey === 'morning' ? '🌅 오전 8시 추천' : '☀️ 정오 추천';
+                    return (
+                      <div key={slotKey} className="mb-6">
+                        <p className="text-sm font-medium text-dark-400 mb-2">{slotLabel}</p>
+                        <div className="space-y-2">
+                          {v.top5.map((stock) => {
+                            const streakInfo = getStockStreakInfo(stock.symbol, v.date);
+                            const isFirstDay = streakInfo?.firstDate === v.date;
+                            return (
+                              <button
+                                key={stock.symbol}
+                                onClick={() => handleStockClick(stock.symbol)}
+                                className="w-full flex items-center gap-3 p-3 bg-dark-800/50 rounded-xl hover:bg-dark-800 transition-colors text-left"
+                              >
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm ${getRankBadge(stock.rank)}`}>
+                                  {stock.rank}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium text-dark-100 truncate">{stock.name}</p>
+                                    {isFirstDay && (
+                                      <span className="px-1.5 py-0.5 text-[10px] bg-green-500/20 text-green-400 rounded font-medium">NEW</span>
+                                    )}
+                                    {streakInfo && streakInfo.streak > 1 && (
+                                      <span className="px-1.5 py-0.5 text-[10px] bg-amber-500/20 text-amber-400 rounded font-medium">🔥 {streakInfo.streak}일</span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-dark-500">
+                                    {stock.symbol}
+                                    {streakInfo && streakInfo.totalDays > 1 && (
+                                      <span className="ml-2 text-dark-600">· 총 {streakInfo.totalDays}회 추천</span>
+                                    )}
+                                  </p>
+                                </div>
+                                <div className={`text-lg font-bold ${getScoreColor(stock.avgScore)}`}>{stock.avgScore.toFixed(1)}</div>
+                                <svg className="w-4 h-4 text-dark-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {v.consensusSummary && (
+                          <p className="mt-2 text-xs text-dark-500 leading-relaxed">{v.consensusSummary}</p>
+                        )}
+                      </div>
+                    );
+                  })}
 
-                  {/* Info */}
                   <div className="mt-4 text-center">
                     <p className="text-xs text-dark-600">종목을 클릭하면 추천 이력과 수익률을 확인할 수 있습니다</p>
                   </div>
-
-                  {/* Consensus */}
-                  {selectedVerdict.consensusSummary && (
-                    <div className="mt-6 p-4 bg-dark-800/30 rounded-xl">
-                      <p className="text-sm text-dark-300 leading-relaxed">
-                        🌟 오늘의 테마: {selectedVerdict.theme.name} | {selectedVerdict.top5.filter(s => s.isUnanimous).length}개 종목 만장일치. 1위 {selectedVerdict.top5[0]?.name}({selectedVerdict.top5[0]?.symbol}) 평균 {selectedVerdict.top5[0]?.avgScore.toFixed(1)}점
-                      </p>
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="h-full flex items-center justify-center">

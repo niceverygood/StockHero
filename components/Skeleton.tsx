@@ -4,9 +4,9 @@ export function Skeleton({ className = '' }: { className?: string }) {
   );
 }
 
-export function SkeletonCard() {
+export function SkeletonCard({ className = '' }: { className?: string }) {
   return (
-    <div className="card animate-pulse">
+    <div className={`card animate-pulse ${className}`}>
       <div className="flex items-start gap-4">
         <Skeleton className="w-12 h-12 rounded-xl" />
         <div className="flex-1 space-y-3">
