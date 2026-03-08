@@ -311,7 +311,7 @@ async function chatWithGemini(systemPrompt: string, messages: ChatMessage[]): Pr
     const contextHint = buildConversationContext(messages);
     
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-pro', // 최신 Pro 모델
+      model: 'gemini-3', // Gemini 3
       systemInstruction: systemPrompt + contextHint,
       generationConfig: {
         maxOutputTokens: 2048,
@@ -342,7 +342,7 @@ async function chatWithGPT(systemPrompt: string, messages: ChatMessage[]): Promi
     const contextHint = buildConversationContext(messages);
     
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o-2024-11-20', // 최신 GPT-4o
+      model: 'gpt-5.4', // GPT 5.4
       messages: [
         { role: 'system', content: systemPrompt + contextHint },
         ...messages.map(m => ({

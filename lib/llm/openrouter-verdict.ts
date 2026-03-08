@@ -4,9 +4,9 @@
  */
 
 export const VERDICT_MODELS = {
-  claude: 'anthropic/claude-opus-4-5',     // Claude Opus 4.5 (최신)
-  gemini: 'google/gemini-2.5-pro',         // Gemini 2.5 Pro (최신)
-  gpt: 'openai/gpt-4o',                    // GPT-4o (최신)
+  claude: 'anthropic/claude-opus-4-5',     // Claude Opus 4.5
+  gemini: 'google/gemini-3',               // Gemini 3
+  gpt: 'openai/gpt-5.4',                  // GPT 5.4
 } as const;
 
 export type VerdictModelKey = keyof typeof VERDICT_MODELS;
