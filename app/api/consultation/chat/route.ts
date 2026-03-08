@@ -289,7 +289,7 @@ async function chatWithClaude(systemPrompt: string, messages: ChatMessage[]): Pr
     const contextHint = buildConversationContext(messages);
     
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-opus-4-5-20251101',
       max_tokens: 2048, // 더 긴 응답 허용
       system: systemPrompt + contextHint,
       messages: messages.map(m => ({
@@ -310,8 +310,8 @@ async function chatWithGemini(systemPrompt: string, messages: ChatMessage[]): Pr
   try {
     const contextHint = buildConversationContext(messages);
     
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-2.0-flash', // flash 모델 사용 (rate limit 더 높음)
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-pro', // 최신 Pro 모델
       systemInstruction: systemPrompt + contextHint,
       generationConfig: {
         maxOutputTokens: 2048,
@@ -342,7 +342,7 @@ async function chatWithGPT(systemPrompt: string, messages: ChatMessage[]): Promi
     const contextHint = buildConversationContext(messages);
     
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o', // 더 강력한 모델 사용
+      model: 'gpt-4o-2024-11-20', // 최신 GPT-4o
       messages: [
         { role: 'system', content: systemPrompt + contextHint },
         ...messages.map(m => ({
