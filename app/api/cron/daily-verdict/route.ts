@@ -10,7 +10,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export type VerdictSlot = 'morning' | 'noon';
+export type VerdictSlot = 'morning' | 'afternoon';
 
 // ===== 확장된 분석 대상 종목 (40개 이상) =====
 const ANALYSIS_STOCKS = [
@@ -21,7 +21,7 @@ const ANALYSIS_STOCKS = [
   { symbol: '000880', name: '한화', sector: '방산', per: 12.0, pbr: 1.2, roe: 12.0, dividend: 2.0, growth: 25.0, theme: ['방산', '지주', '태양광'] },
   { symbol: '298040', name: '효성중공업', sector: '중공업', per: 15.0, pbr: 2.5, roe: 22.0, dividend: 1.0, growth: 50.0, theme: ['전력기기', '변압기', 'AI'] },
   { symbol: '267260', name: '현대일렉트릭', sector: '전력기기', per: 12.0, pbr: 2.0, roe: 20.0, dividend: 0.8, growth: 45.0, theme: ['전력기기', '변압기'] },
-  
+
   // ===== 반도체/AI (핵심 성장) =====
   { symbol: '000660', name: 'SK하이닉스', sector: '반도체', per: 8.5, pbr: 2.0, roe: 25.0, dividend: 0.5, growth: 55.0, theme: ['반도체', 'AI', 'HBM'] },
   { symbol: '005930', name: '삼성전자', sector: '반도체', per: 12.0, pbr: 1.2, roe: 10.0, dividend: 2.0, growth: 15.0, theme: ['반도체', 'AI', '파운드리'] },
@@ -30,43 +30,43 @@ const ANALYSIS_STOCKS = [
   { symbol: '039030', name: '이오테크닉스', sector: '반도체장비', per: 25.0, pbr: 4.0, roe: 20.0, dividend: 0.2, growth: 50.0, theme: ['반도체장비', '레이저', 'HBM'] },
   { symbol: '403870', name: '피에스케이홀딩스', sector: '반도체장비', per: 15.0, pbr: 3.5, roe: 22.0, dividend: 0.3, growth: 55.0, theme: ['반도체장비', 'AI'] },
   { symbol: '091990', name: '셀트리온헬스케어', sector: '반도체장비', per: 18.0, pbr: 4.0, roe: 20.0, dividend: 0.2, growth: 40.0, theme: ['반도체장비'] },
-  
+
   // ===== AI/로봇 (미래 성장동력) =====
   { symbol: '443060', name: '레인보우로보틱스', sector: 'AI/로봇', per: 100.0, pbr: 18.0, roe: 8.0, dividend: 0.0, growth: 120.0, theme: ['로봇', '휴머노이드', 'AI'] },
   { symbol: '454910', name: '두산로보틱스', sector: 'AI/로봇', per: 80.0, pbr: 12.0, roe: 5.0, dividend: 0.0, growth: 90.0, theme: ['로봇', '협동로봇', 'AI'] },
   { symbol: '272110', name: '케이씨텍', sector: 'AI/로봇', per: 20.0, pbr: 3.5, roe: 18.0, dividend: 0.5, growth: 40.0, theme: ['반도체장비', 'AI'] },
-  
+
   // ===== 바이오/헬스케어 (고성장) =====
   { symbol: '207940', name: '삼성바이오로직스', sector: '바이오', per: 50.0, pbr: 5.5, roe: 12.0, dividend: 0.1, growth: 30.0, theme: ['바이오', 'CMO', 'ADC'] },
   { symbol: '068270', name: '셀트리온', sector: '바이오', per: 40.0, pbr: 4.5, roe: 14.0, dividend: 0.2, growth: 25.0, theme: ['바이오', '바이오시밀러'] },
   { symbol: '326030', name: 'SK바이오팜', sector: '바이오', per: 60.0, pbr: 7.0, roe: 15.0, dividend: 0.0, growth: 55.0, theme: ['바이오', '신약', 'CNS'] },
   { symbol: '145020', name: '휴젤', sector: '바이오', per: 30.0, pbr: 5.5, roe: 20.0, dividend: 0.3, growth: 35.0, theme: ['바이오', '보톡스', '미용'] },
   { symbol: '357780', name: '솔브레인', sector: '반도체소재', per: 12.0, pbr: 2.5, roe: 22.0, dividend: 1.5, growth: 25.0, theme: ['반도체소재', '전해질'] },
-  
+
   // ===== 자동차/모빌리티 (가치+성장) =====
   { symbol: '005380', name: '현대차', sector: '자동차', per: 6.5, pbr: 0.8, roe: 14.0, dividend: 3.5, growth: 12.0, theme: ['자동차', '전기차', '수소차'] },
   { symbol: '000270', name: '기아', sector: '자동차', per: 6.0, pbr: 0.7, roe: 15.0, dividend: 4.0, growth: 14.0, theme: ['자동차', '전기차', 'EV9'] },
   { symbol: '012330', name: '현대모비스', sector: '자동차부품', per: 7.5, pbr: 0.6, roe: 10.0, dividend: 3.0, growth: 10.0, theme: ['자동차부품', '자율주행', 'SDV'] },
   { symbol: '204320', name: '만도', sector: '자동차부품', per: 10.0, pbr: 1.2, roe: 12.0, dividend: 1.5, growth: 20.0, theme: ['자동차부품', '자율주행', 'ADAS'] },
-  
+
   // ===== IT/플랫폼 =====
   { symbol: '035420', name: 'NAVER', sector: 'IT서비스', per: 18.0, pbr: 1.4, roe: 12.0, dividend: 0.3, growth: 20.0, theme: ['플랫폼', 'AI', '클라우드'] },
   { symbol: '035720', name: '카카오', sector: 'IT서비스', per: 22.0, pbr: 1.6, roe: 10.0, dividend: 0.2, growth: 18.0, theme: ['플랫폼', 'AI', '콘텐츠'] },
   { symbol: '259960', name: '크래프톤', sector: '게임', per: 12.0, pbr: 2.0, roe: 20.0, dividend: 1.5, growth: 18.0, theme: ['게임', 'PUBG', 'AI'] },
-  
+
   // ===== 2차전지 (선별) =====
   { symbol: '373220', name: 'LG에너지솔루션', sector: '2차전지', per: 35.0, pbr: 3.8, roe: 16.0, dividend: 0.3, growth: 40.0, theme: ['2차전지', '전기차', 'ESS'] },
   { symbol: '006400', name: '삼성SDI', sector: '2차전지', per: 25.0, pbr: 2.2, roe: 15.0, dividend: 0.5, growth: 35.0, theme: ['2차전지', '전기차', '전고체'] },
   { symbol: '003670', name: '포스코홀딩스', sector: '소재', per: 10.0, pbr: 0.8, roe: 10.0, dividend: 3.0, growth: 15.0, theme: ['철강', '2차전지소재', '리튬'] },
-  
+
   // ===== 금융 (배당 - 축소) =====
   { symbol: '105560', name: 'KB금융', sector: '금융', per: 5.8, pbr: 0.55, roe: 11.0, dividend: 5.5, growth: 8.0, theme: ['금융', '배당', '밸류업'] },
   { symbol: '086790', name: '하나금융지주', sector: '금융', per: 5.0, pbr: 0.5, roe: 12.0, dividend: 6.0, growth: 10.0, theme: ['금융', '배당', '밸류업'] },
-  
+
   // ===== 전력/인프라 (데이터센터 수혜) =====
   { symbol: '034730', name: 'SK', sector: '지주', per: 8.0, pbr: 0.6, roe: 10.0, dividend: 4.0, growth: 12.0, theme: ['지주', 'AI', '반도체'] },
   { symbol: '051900', name: 'LG생활건강', sector: '화장품', per: 18.0, pbr: 2.5, roe: 15.0, dividend: 1.5, growth: 12.0, theme: ['화장품', '중국', '리오프닝'] },
-  
+
   // ===== 엔터/콘텐츠 =====
   { symbol: '352820', name: '하이브', sector: '엔터', per: 28.0, pbr: 4.5, roe: 18.0, dividend: 0.2, growth: 35.0, theme: ['엔터', 'K-POP', 'AI'] },
   { symbol: '041510', name: 'SM', sector: '엔터', per: 22.0, pbr: 3.5, roe: 15.0, dividend: 0.5, growth: 28.0, theme: ['엔터', 'K-POP'] },
@@ -343,13 +343,13 @@ function aggregateTop5(claudeTop5: any[], geminiTop5: any[], gptTop5: any[], rea
   return aggregated;
 }
 
-// KST 기준 현재 시각에서 slot 결정 (8시→morning, 12시→noon)
+// KST 기준 현재 시각에서 slot 결정 (8시→morning, 16시→afternoon)
 function getSlotFromKST(): VerdictSlot {
   const now = new Date();
   const kstOffset = 9 * 60;
   const kstTime = new Date(now.getTime() + (kstOffset + now.getTimezoneOffset()) * 60 * 1000);
   const hour = kstTime.getHours();
-  if (hour >= 11 && hour < 14) return 'noon';
+  if (hour >= 12) return 'afternoon';
   return 'morning';
 }
 
@@ -357,7 +357,7 @@ export async function GET(request: NextRequest) {
   // Verify cron secret (for security in production)
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
-  
+
   // In development, allow without auth
   if (process.env.NODE_ENV === 'production' && cronSecret && authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -371,15 +371,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // URL 파라미터: date, slot(morning|noon), force
+  // URL 파라미터: date, slot(morning|afternoon), force
   const { searchParams } = new URL(request.url);
   const customDate = searchParams.get('date');
   const slotParam = searchParams.get('slot') as VerdictSlot | null;
-  const slot: VerdictSlot = slotParam === 'noon' || slotParam === 'morning' ? slotParam : getSlotFromKST();
-  
+  const slot: VerdictSlot = slotParam === 'afternoon' || slotParam === 'morning' ? slotParam : getSlotFromKST();
+
   let today: string;
   let dateForTheme: Date;
-  
+
   if (customDate && /^\d{4}-\d{2}-\d{2}$/.test(customDate)) {
     today = customDate;
     dateForTheme = new Date(customDate + 'T00:00:00+09:00');
@@ -390,7 +390,7 @@ export async function GET(request: NextRequest) {
     today = kstTime.toISOString().split('T')[0];
     dateForTheme = kstTime;
   }
-  
+
   const todayTheme = getTodayTheme(dateForTheme);
   console.log(`[${today}] [${slot}] Starting daily verdict generation...`);
   console.log(`[${today}] Today's theme: ${todayTheme.emoji} ${todayTheme.name}`);
@@ -398,26 +398,27 @@ export async function GET(request: NextRequest) {
   const force = searchParams.get('force') === 'true';
 
   try {
-    // 1. 해당 날짜+slot에 이미 생성된 verdict가 있는지 확인
-    const { data: existingVerdict } = await supabase
+    // 1. 해당 날짜에 이미 생성된 verdict가 있는지 확인
+    const { data: existingVerdicts } = await supabase
       .from('verdicts')
       .select('*')
-      .eq('date', today)
-      .eq('slot', slot)
-      .maybeSingle();
+      .eq('date', today);
+
+    const existingVerdict = existingVerdicts?.find(v => v.slot === slot) || existingVerdicts?.[0];
 
     if (existingVerdict && !force) {
       console.log(`[${today}] [${slot}] Verdict already exists`);
-      return NextResponse.json({ 
-        success: true, 
+      return NextResponse.json({
+        success: true,
         message: `Verdict already exists for ${today} (${slot})`,
-        verdict: existingVerdict 
+        verdict: existingVerdict
       });
     }
 
-    if (existingVerdict && force) {
-      console.log(`[${today}] [${slot}] Force regeneration - deleting existing...`);
-      await supabase.from('verdicts').delete().eq('date', today).eq('slot', slot);
+    if (existingVerdicts?.length && force) {
+      console.log(`[${today}] [${slot}] Force regeneration - deleting ${existingVerdicts.length} existing record(s)...`);
+      // 해당 날짜의 모든 verdict 삭제 (null slot 포함)
+      await supabase.from('verdicts').delete().eq('date', today);
       // predictions는 verdict_id CASCADE로 자동 삭제됨
     }
 
@@ -428,7 +429,7 @@ export async function GET(request: NextRequest) {
     // 3. 실시간 가격 조회
     const symbols = targetStocks.map(s => s.symbol);
     let realPrices: Map<string, any> = new Map();
-    
+
     try {
       realPrices = await fetchMultipleStockPrices(symbols);
       console.log(`[${today}] Fetched real-time prices for ${realPrices.size} stocks`);
@@ -506,7 +507,7 @@ export async function GET(request: NextRequest) {
         insertData: { date: insertData.date, top5Count: insertData.top5?.length },
       }, { status: 500 });
     }
-    
+
     if (!verdict) {
       return NextResponse.json({
         success: false,

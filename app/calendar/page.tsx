@@ -16,22 +16,33 @@ interface Top5Item {
   isUnanimous: boolean;
   price?: number;
   currentPrice?: number;
+  reasons?: string[];
 }
 
 interface DayVerdict {
   date: string;
-  slot?: 'morning' | 'noon';
+  slot?: 'morning' | 'afternoon';
   theme: { name: string; emoji: string };
   top5: Top5Item[];
   consensusSummary: string;
 }
 
+interface VerdictDetailData {
+  date: string;
+  theme: { name: string; emoji: string };
+  top5: Top5Item[];
+  claudeTop5: Array<{ rank: number; symbol: string; name: string; score: number; reason: string }>;
+  geminiTop5: Array<{ rank: number; symbol: string; name: string; score: number; reason: string }>;
+  gptTop5: Array<{ rank: number; symbol: string; name: string; score: number; reason: string }>;
+  consensusSummary: string;
+}
+
 /** 날짜별 오전 8시 / 정오 추천 (둘 다 있을 수 있음) */
-type DayVerdictsBySlot = Record<string, { morning?: DayVerdict; noon?: DayVerdict }>;
+type DayVerdictsBySlot = Record<string, { morning?: DayVerdict; afternoon?: DayVerdict }>;
 
 interface RecommendationRecord {
   date: string;
-  slot?: 'morning' | 'noon';
+  slot?: 'morning' | 'afternoon';
   rank: number;
   score: number;
   price?: number;
@@ -77,6 +88,9 @@ export default function CalendarPage() {
   const [stockPrices, setStockPrices] = useState<Record<string, PriceData>>({});
   const [loading, setLoading] = useState(true);
   const [priceLoading, setPriceLoading] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [detailData, setDetailData] = useState<VerdictDetailData | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -94,12 +108,12 @@ export default function CalendarPage() {
 
   const fetchStockPrice = async (symbol: string) => {
     if (stockPrices[symbol]) return;
-    
+
     setPriceLoading(true);
     try {
       const res = await fetch(`/api/stocks/price?symbol=${symbol}`);
       const data = await res.json();
-      
+
       if (data.success && data.data) {
         setStockPrices(prev => ({
           ...prev,
@@ -121,23 +135,23 @@ export default function CalendarPage() {
   const fetchMonthVerdicts = useCallback(async () => {
     const cacheKey = `${year}-${month + 1}`;
     const cached = verdictCache.get(cacheKey);
-    
+
     // 캐시가 유효하면 캐시 사용
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
       setVerdicts(cached.data);
       setLoading(false);
       return;
     }
-    
+
     try {
       setLoading(true);
       const res = await fetch(`/api/calendar/verdicts?year=${year}&month=${month + 1}`);
       const data = await res.json();
-      
+
       if (data.success && data.verdicts) {
         const verdictMap: DayVerdictsBySlot = {};
         data.verdicts.forEach((v: any) => {
-          const slot = v.slot === 'noon' ? 'noon' : 'morning';
+          const slot = v.slot === 'afternoon' ? 'afternoon' : 'morning';
           if (!verdictMap[v.date]) verdictMap[v.date] = {};
           verdictMap[v.date][slot] = { ...v, slot };
         });
@@ -158,7 +172,7 @@ export default function CalendarPage() {
 
     sortedDates.forEach(date => {
       const slots = verdicts[date];
-      (['morning', 'noon'] as const).forEach(slotKey => {
+      (['morning', 'afternoon'] as const).forEach(slotKey => {
         const verdict = slots[slotKey];
         if (!verdict?.top5) return;
         verdict.top5.forEach((stock: Top5Item) => {
@@ -210,7 +224,7 @@ export default function CalendarPage() {
     // 연속 추천일 및 평균가 계산
     Object.values(histories).forEach(history => {
       history.recommendations.sort((a, b) => b.date.localeCompare(a.date));
-      
+
       // 평균 추천가 계산
       const pricesWithValue = history.recommendations.filter(r => r.price && r.price > 0);
       if (pricesWithValue.length > 0) {
@@ -218,16 +232,16 @@ export default function CalendarPage() {
           pricesWithValue.reduce((sum, r) => sum + (r.price || 0), 0) / pricesWithValue.length
         );
       }
-      
+
       // 첫 추천가
       const sortedByDate = [...history.recommendations].sort((a, b) => a.date.localeCompare(b.date));
       if (sortedByDate[0]?.price) {
         history.firstRecommendPrice = sortedByDate[0].price;
       }
-      
+
       let streak = 0;
       let prevDate: string | null = null;
-      
+
       for (const rec of history.recommendations) {
         if (!prevDate) {
           streak = 1;
@@ -235,7 +249,7 @@ export default function CalendarPage() {
           const prev = new Date(prevDate);
           const curr = new Date(rec.date);
           const diffDays = Math.round((prev.getTime() - curr.getTime()) / (1000 * 60 * 60 * 24));
-          
+
           if (diffDays === 1) {
             streak++;
           } else {
@@ -244,7 +258,7 @@ export default function CalendarPage() {
         }
         prevDate = rec.date;
       }
-      
+
       history.currentStreak = streak;
     });
 
@@ -257,13 +271,13 @@ export default function CalendarPage() {
     if (!history) return null;
 
     const sortedRecs = [...history.recommendations].sort((a, b) => a.date.localeCompare(b.date));
-    
+
     let streak = 0;
     let streakStart = '';
-    
+
     for (let i = 0; i < sortedRecs.length; i++) {
       if (sortedRecs[i].date > currentDateStr) break;
-      
+
       if (i === 0 || sortedRecs[i].date <= currentDateStr) {
         if (i === 0) {
           streak = 1;
@@ -272,7 +286,7 @@ export default function CalendarPage() {
           const prev = new Date(sortedRecs[i - 1].date);
           const curr = new Date(sortedRecs[i].date);
           const diffDays = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
-          
+
           if (diffDays === 1) {
             streak++;
           } else {
@@ -299,22 +313,100 @@ export default function CalendarPage() {
     }
   };
 
+  // 날짜 클릭 시 상세 모달 열기
+  const handleDateClick = async (dateStr: string) => {
+    setSelectedDate(dateStr);
+    setSelectedStock(null);
+    setShowDetailModal(true);
+    setDetailLoading(true);
+    setDetailData(null);
+
+    try {
+      const res = await fetch(`/api/verdict?date=${dateStr}`);
+      const data = await res.json();
+
+      if (data.success && data.top5) {
+        // verdict/today 형식으로도 시도
+        const resDetail = await fetch(`/api/calendar/verdicts?year=${dateStr.slice(0, 4)}&month=${parseInt(dateStr.slice(5, 7))}`);
+        const calData = await resDetail.json();
+        const matchVerdict = calData.verdicts?.find((v: any) => v.date === dateStr);
+
+        const dayOfWeek = new Date(dateStr + 'T00:00:00+09:00').getDay();
+        const DAY_THEMES: Record<number, { name: string; emoji: string }> = {
+          0: { name: '종합 밸런스', emoji: '⚖️' },
+          1: { name: '성장주 포커스', emoji: '🚀' },
+          2: { name: '배당 투자', emoji: '💰' },
+          3: { name: '가치 투자', emoji: '💎' },
+          4: { name: '테마 & 트렌드', emoji: '🔥' },
+          5: { name: '블루칩', emoji: '🏆' },
+          6: { name: '히든 젬', emoji: '🌟' },
+        };
+
+        setDetailData({
+          date: dateStr,
+          theme: matchVerdict?.theme || DAY_THEMES[dayOfWeek] || { name: '추천', emoji: '📊' },
+          top5: data.top5.map((item: any) => ({
+            rank: item.rank,
+            symbol: item.symbol,
+            name: item.name,
+            avgScore: item.avgScore,
+            claudeScore: item.claudeScore || 0,
+            geminiScore: item.geminiScore || 0,
+            gptScore: item.gptScore || 0,
+            isUnanimous: item.unanimous || item.isUnanimous || false,
+            currentPrice: item.currentPrice || 0,
+            reasons: item.reasons || [],
+          })),
+          claudeTop5: [],  // 개별 AI top5는 별도 API 필요
+          geminiTop5: [],
+          gptTop5: [],
+          consensusSummary: data.rationale || matchVerdict?.consensusSummary || '',
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch detail:', error);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  // 모달 닫기
+  const closeDetailModal = () => {
+    setShowDetailModal(false);
+    setDetailData(null);
+  };
+
+  // ESC 키로 모달 닫기
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeDetailModal();
+    };
+    if (showDetailModal) {
+      document.addEventListener('keydown', handleEsc);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.removeEventListener('keydown', handleEsc);
+      document.body.style.overflow = 'unset';
+    };
+  }, [showDetailModal]);
+
   const getDaysInMonth = () => {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
     const startingDay = firstDay.getDay();
-    
+
     const days: (number | null)[] = [];
-    
+
     for (let i = 0; i < startingDay; i++) {
       days.push(null);
     }
-    
+
     for (let i = 1; i <= daysInMonth; i++) {
       days.push(i);
     }
-    
+
     return days;
   };
 
@@ -374,7 +466,7 @@ export default function CalendarPage() {
   return (
     <>
       <Header />
-      
+
       <main className="min-h-screen bg-dark-950 pt-24 pb-12">
         {/* Background */}
         <div className="fixed inset-0 bg-grid opacity-30" />
@@ -424,9 +516,8 @@ export default function CalendarPage() {
                 {WEEKDAYS.map((day, i) => (
                   <div
                     key={day}
-                    className={`text-center text-sm font-medium py-2 ${
-                      i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-dark-500'
-                    }`}
+                    className={`text-center text-sm font-medium py-2 ${i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-dark-500'
+                      }`}
                   >
                     {day}
                   </div>
@@ -442,12 +533,12 @@ export default function CalendarPage() {
 
                   const dateStr = formatDateString(day);
                   const daySlots = verdicts[dateStr];
-                  const hasData = !!daySlots && (!!daySlots.morning || !!daySlots.noon);
+                  const hasData = !!daySlots && (!!daySlots.morning || !!daySlots.afternoon);
                   const isSelected = selectedDate === dateStr;
                   const dayOfWeek = new Date(year, month, day).getDay();
                   const hasUnanimous = hasData && (
                     (daySlots.morning?.top5.some(stock => stock.isUnanimous)) ||
-                    (daySlots.noon?.top5.some(stock => stock.isUnanimous))
+                    (daySlots.afternoon?.top5.some(stock => stock.isUnanimous))
                   );
 
                   return (
@@ -455,35 +546,32 @@ export default function CalendarPage() {
                       key={day}
                       onClick={() => {
                         if (hasData) {
-                          setSelectedDate(dateStr);
-                          setSelectedStock(null);
+                          handleDateClick(dateStr);
                         }
                       }}
                       disabled={!hasData}
-                      className={`aspect-square rounded-xl flex flex-col items-center justify-center transition-all relative ${
-                        isSelected
-                          ? 'bg-brand-500 text-white'
-                          : hasUnanimous
+                      className={`aspect-square rounded-xl flex flex-col items-center justify-center transition-all relative ${isSelected
+                        ? 'bg-brand-500 text-white'
+                        : hasUnanimous
                           ? 'bg-gradient-to-br from-amber-500/20 to-orange-500/20 border-2 border-amber-500/50 hover:border-amber-400 cursor-pointer'
                           : hasData
-                          ? 'bg-dark-800 hover:bg-dark-700 cursor-pointer'
-                          : 'text-dark-600 cursor-default'
-                      }`}
+                            ? 'bg-dark-800 hover:bg-dark-700 cursor-pointer'
+                            : 'text-dark-600 cursor-default'
+                        }`}
                     >
                       {/* 만장일치 표시 - 좌상단 별 */}
                       {hasUnanimous && !isSelected && (
                         <span className="absolute -top-1 -right-1 text-amber-400 text-xs animate-pulse">✨</span>
                       )}
-                      <span className={`text-sm font-medium ${
-                        !isSelected && dayOfWeek === 0 ? 'text-red-400' : 
+                      <span className={`text-sm font-medium ${!isSelected && dayOfWeek === 0 ? 'text-red-400' :
                         !isSelected && dayOfWeek === 6 ? 'text-blue-400' :
-                        !isSelected && hasUnanimous ? 'text-amber-300' : ''
-                      }`}>
+                          !isSelected && hasUnanimous ? 'text-amber-300' : ''
+                        }`}>
                         {day}
                       </span>
                       {hasData && (
                         <span className="text-xs mt-0.5">
-                          {(verdicts[dateStr].morning ?? verdicts[dateStr].noon)?.theme.emoji}
+                          {(verdicts[dateStr].morning ?? verdicts[dateStr].afternoon)?.theme.emoji}
                         </span>
                       )}
                     </button>
@@ -570,7 +658,7 @@ export default function CalendarPage() {
                   {/* AI별 추천 통계 */}
                   <div className="bg-dark-800/30 rounded-xl p-4 mb-4">
                     <p className="text-sm font-medium text-dark-400 mb-3">🤖 AI별 추천 현황</p>
-                    
+
                     {/* 상세 데이터 존재 여부 확인 */}
                     {(selectedStock.claudeVotes + selectedStock.geminiVotes + selectedStock.gptVotes) > 0 ? (
                       <>
@@ -622,7 +710,7 @@ export default function CalendarPage() {
                         <p className="text-dark-400 text-sm mb-1">AI 합산 추천</p>
                         <p className="text-2xl font-bold text-brand-400">{selectedStock.totalDays}회</p>
                         <p className="text-xs text-dark-600 mt-2">
-                          * 이전 버전 데이터로 AI별 상세 통계가 없습니다<br/>
+                          * 이전 버전 데이터로 AI별 상세 통계가 없습니다<br />
                           새로 생성되는 데이터부터 상세 정보가 기록됩니다
                         </p>
                       </div>
@@ -660,7 +748,7 @@ export default function CalendarPage() {
                           </p>
                         )}
                       </div>
-                      
+
                       {/* 평균 추천가 대비 */}
                       <div className="bg-dark-800/30 rounded-xl p-3">
                         <p className="text-xs text-dark-500 mb-1">평균 추천가 대비</p>
@@ -706,23 +794,22 @@ export default function CalendarPage() {
                         .map((rec) => {
                           const currentPrice = stockPrices[selectedStock.symbol]?.price;
                           const returnPct = rec.price && currentPrice ? calculateReturn(currentPrice, rec.price) : null;
-                          
+
                           // 개별 AI 점수가 있는지 확인
                           const hasDetailedScores = rec.claudeScore > 0 || rec.geminiScore > 0 || rec.gptScore > 0;
-                          
+
                           // 추천한 AI 개수 추정 (상세 점수 없는 경우)
-                          const estimatedVoters = hasDetailedScores 
-                            ? rec.votedCount 
+                          const estimatedVoters = hasDetailedScores
+                            ? rec.votedCount
                             : Math.max(1, Math.ceil(rec.score / 1.7)); // avgScore 기반 추정
-                          
+
                           return (
                             <div
                               key={rec.date}
-                              className={`p-3 rounded-xl border ${
-                                rec.isUnanimous 
-                                  ? 'bg-amber-500/5 border-amber-500/30' 
-                                  : 'bg-dark-800/50 border-dark-700/50'
-                              }`}
+                              className={`p-3 rounded-xl border ${rec.isUnanimous
+                                ? 'bg-amber-500/5 border-amber-500/30'
+                                : 'bg-dark-800/50 border-dark-700/50'
+                                }`}
                             >
                               {/* 헤더: 날짜, 순위, 배지 */}
                               <div className="flex items-center justify-between mb-2">
@@ -752,49 +839,43 @@ export default function CalendarPage() {
                                   )}
                                 </div>
                               </div>
-                              
+
                               {/* AI별 점수 - 상세 데이터가 있을 때만 */}
                               {hasDetailedScores ? (
                                 <div className="grid grid-cols-3 gap-1.5">
-                                  <div className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg ${
-                                    rec.claudeScore > 0 
-                                      ? 'bg-purple-500/20 border border-purple-500/30' 
-                                      : 'bg-dark-800/50 border border-dark-700/30'
-                                  }`}>
+                                  <div className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg ${rec.claudeScore > 0
+                                    ? 'bg-purple-500/20 border border-purple-500/30'
+                                    : 'bg-dark-800/50 border border-dark-700/30'
+                                    }`}>
                                     <div className="w-5 h-5 rounded-full overflow-hidden">
                                       <Image src={CHARACTERS.claude.image} alt="Claude" width={20} height={20} className="w-full h-full object-cover" />
                                     </div>
-                                    <span className={`text-xs font-bold ${
-                                      rec.claudeScore > 0 ? 'text-purple-400' : 'text-dark-600'
-                                    }`}>
+                                    <span className={`text-xs font-bold ${rec.claudeScore > 0 ? 'text-purple-400' : 'text-dark-600'
+                                      }`}>
                                       {rec.claudeScore > 0 ? rec.claudeScore.toFixed(1) : '-'}
                                     </span>
                                   </div>
-                                  <div className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg ${
-                                    rec.geminiScore > 0 
-                                      ? 'bg-blue-500/20 border border-blue-500/30' 
-                                      : 'bg-dark-800/50 border border-dark-700/30'
-                                  }`}>
+                                  <div className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg ${rec.geminiScore > 0
+                                    ? 'bg-blue-500/20 border border-blue-500/30'
+                                    : 'bg-dark-800/50 border border-dark-700/30'
+                                    }`}>
                                     <div className="w-5 h-5 rounded-full overflow-hidden">
                                       <Image src={CHARACTERS.gemini.image} alt="Gemini" width={20} height={20} className="w-full h-full object-cover" />
                                     </div>
-                                    <span className={`text-xs font-bold ${
-                                      rec.geminiScore > 0 ? 'text-blue-400' : 'text-dark-600'
-                                    }`}>
+                                    <span className={`text-xs font-bold ${rec.geminiScore > 0 ? 'text-blue-400' : 'text-dark-600'
+                                      }`}>
                                       {rec.geminiScore > 0 ? rec.geminiScore.toFixed(1) : '-'}
                                     </span>
                                   </div>
-                                  <div className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg ${
-                                    rec.gptScore > 0 
-                                      ? 'bg-emerald-500/20 border border-emerald-500/30' 
-                                      : 'bg-dark-800/50 border border-dark-700/30'
-                                  }`}>
+                                  <div className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg ${rec.gptScore > 0
+                                    ? 'bg-emerald-500/20 border border-emerald-500/30'
+                                    : 'bg-dark-800/50 border border-dark-700/30'
+                                    }`}>
                                     <div className="w-5 h-5 rounded-full overflow-hidden">
                                       <Image src={CHARACTERS.gpt.image} alt="GPT" width={20} height={20} className="w-full h-full object-cover" />
                                     </div>
-                                    <span className={`text-xs font-bold ${
-                                      rec.gptScore > 0 ? 'text-emerald-400' : 'text-dark-600'
-                                    }`}>
+                                    <span className={`text-xs font-bold ${rec.gptScore > 0 ? 'text-emerald-400' : 'text-dark-600'
+                                      }`}>
                                       {rec.gptScore > 0 ? rec.gptScore.toFixed(1) : '-'}
                                     </span>
                                   </div>
@@ -821,7 +902,7 @@ export default function CalendarPage() {
                                   </p>
                                 </div>
                               )}
-                              
+
                               {/* 가격 정보 */}
                               {rec.price && rec.price > 0 && (
                                 <div className="mt-2 pt-2 border-t border-dark-700/30 flex items-center justify-between text-xs text-dark-500">
@@ -839,17 +920,17 @@ export default function CalendarPage() {
                 // Day Detail View (오전 8시 / 정오 두 시점 표시)
                 <div>
                   <div className="flex items-center gap-3 mb-4">
-                    <span className="text-3xl">{(selectedSlots.morning ?? selectedSlots.noon)?.theme.emoji ?? '📊'}</span>
+                    <span className="text-3xl">{(selectedSlots.morning ?? selectedSlots.afternoon)?.theme.emoji ?? '📊'}</span>
                     <div>
                       <p className="text-lg font-bold text-dark-100">{selectedDate}</p>
-                      <p className="text-sm text-dark-400">{(selectedSlots.morning ?? selectedSlots.noon)?.theme.name}</p>
+                      <p className="text-sm text-dark-400">{(selectedSlots.morning ?? selectedSlots.afternoon)?.theme.name}</p>
                     </div>
                   </div>
 
-                  {(['morning', 'noon'] as const).map((slotKey) => {
+                  {(['morning', 'afternoon'] as const).map((slotKey) => {
                     const v = selectedSlots[slotKey];
                     if (!v?.top5?.length) return null;
-                    const slotLabel = slotKey === 'morning' ? '🌅 오전 8시 추천' : '☀️ 정오 추천';
+                    const slotLabel = slotKey === 'morning' ? '🌅 오전 8시 추천' : '🌆 오후 4시 추천';
                     return (
                       <div key={slotKey} className="mb-6">
                         <p className="text-sm font-medium text-dark-400 mb-2">{slotLabel}</p>
@@ -914,6 +995,181 @@ export default function CalendarPage() {
             </div>
           </div>
         </div>
+
+        {/* Date Detail Modal */}
+        {showDetailModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={closeDetailModal}
+          >
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+
+            {/* Modal Content */}
+            <div
+              className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto bg-dark-900 border border-dark-700 rounded-2xl shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="sticky top-0 z-10 bg-dark-900/95 backdrop-blur-sm border-b border-dark-800 p-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">{detailData?.theme?.emoji || '📊'}</span>
+                    <div>
+                      <p className="text-lg font-bold text-dark-100">
+                        {selectedDate && new Date(selectedDate + 'T00:00:00+09:00').toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
+                      </p>
+                      <p className="text-sm text-dark-400">{detailData?.theme?.name || '로딩 중...'}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={closeDetailModal}
+                    className="p-2 hover:bg-dark-800 rounded-xl transition-colors"
+                  >
+                    <svg className="w-5 h-5 text-dark-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="p-5">
+                {detailLoading ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <div className="w-10 h-10 border-3 border-brand-500 border-t-transparent rounded-full animate-spin mb-4" />
+                    <p className="text-dark-400">AI 분석 데이터 로딩 중...</p>
+                  </div>
+                ) : detailData ? (
+                  <div className="space-y-4">
+                    {/* Top 5 List */}
+                    {detailData.top5.map((stock) => {
+                      const streakInfo = getStockStreakInfo(stock.symbol, detailData.date);
+
+                      return (
+                        <div
+                          key={stock.symbol}
+                          className={`p-4 rounded-xl border transition-all ${stock.isUnanimous
+                            ? 'bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/30'
+                            : 'bg-dark-800/60 border-dark-700/50 hover:border-dark-600'
+                            }`}
+                        >
+                          {/* Stock Header */}
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-sm ${getRankBadge(stock.rank)}`}>
+                              {stock.rank}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="font-bold text-dark-100 truncate">{stock.name}</p>
+                                {stock.isUnanimous && (
+                                  <span className="px-1.5 py-0.5 text-[10px] bg-amber-500/20 text-amber-400 rounded-full font-bold">✨ 만장일치</span>
+                                )}
+                                {streakInfo && streakInfo.streak > 1 && (
+                                  <span className="px-1.5 py-0.5 text-[10px] bg-red-500/20 text-red-400 rounded-full font-medium">🔥 {streakInfo.streak}일 연속</span>
+                                )}
+                              </div>
+                              <p className="text-xs text-dark-500">
+                                {stock.symbol}
+                                {(stock.currentPrice ?? 0) > 0 && ` · ${(stock.currentPrice ?? 0).toLocaleString()}원`}
+                              </p>
+                            </div>
+                            <div className={`text-xl font-bold ${getScoreColor(stock.avgScore)}`}>
+                              {stock.avgScore.toFixed(1)}
+                            </div>
+                          </div>
+
+                          {/* AI Individual Scores */}
+                          <div className="grid grid-cols-3 gap-2">
+                            {/* Claude */}
+                            <div className={`flex items-center gap-2 p-2 rounded-lg ${stock.claudeScore > 0
+                              ? 'bg-purple-500/15 border border-purple-500/25'
+                              : 'bg-dark-800/40 border border-dark-700/30'
+                              }`}>
+                              <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0">
+                                <Image src={CHARACTERS.claude.image} alt="Claude" width={24} height={24} className="w-full h-full object-cover" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className={`text-sm font-bold ${stock.claudeScore > 0 ? 'text-purple-400' : 'text-dark-600'}`}>
+                                  {stock.claudeScore > 0 ? stock.claudeScore.toFixed(1) : '-'}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Gemini */}
+                            <div className={`flex items-center gap-2 p-2 rounded-lg ${stock.geminiScore > 0
+                              ? 'bg-blue-500/15 border border-blue-500/25'
+                              : 'bg-dark-800/40 border border-dark-700/30'
+                              }`}>
+                              <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0">
+                                <Image src={CHARACTERS.gemini.image} alt="Gemini" width={24} height={24} className="w-full h-full object-cover" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className={`text-sm font-bold ${stock.geminiScore > 0 ? 'text-blue-400' : 'text-dark-600'}`}>
+                                  {stock.geminiScore > 0 ? stock.geminiScore.toFixed(1) : '-'}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* GPT */}
+                            <div className={`flex items-center gap-2 p-2 rounded-lg ${stock.gptScore > 0
+                              ? 'bg-emerald-500/15 border border-emerald-500/25'
+                              : 'bg-dark-800/40 border border-dark-700/30'
+                              }`}>
+                              <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0">
+                                <Image src={CHARACTERS.gpt.image} alt="GPT" width={24} height={24} className="w-full h-full object-cover" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className={`text-sm font-bold ${stock.gptScore > 0 ? 'text-emerald-400' : 'text-dark-600'}`}>
+                                  {stock.gptScore > 0 ? stock.gptScore.toFixed(1) : '-'}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Reasons */}
+                          {stock.reasons && stock.reasons.length > 0 && (
+                            <div className="mt-3 space-y-1">
+                              {stock.reasons.map((reason, i) => (
+                                <p key={i} className="text-xs text-dark-400 leading-relaxed">💬 {reason}</p>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Stock history link button */}
+                          <button
+                            onClick={() => {
+                              handleStockClick(stock.symbol);
+                              closeDetailModal();
+                            }}
+                            className="mt-3 w-full text-center text-xs text-brand-400 hover:text-brand-300 py-1.5 rounded-lg hover:bg-brand-500/10 transition-colors"
+                          >
+                            📜 추천 이력 보기 →
+                          </button>
+                        </div>
+                      );
+                    })}
+
+                    {/* Consensus Summary */}
+                    {detailData.consensusSummary && (
+                      <div className="p-4 bg-dark-800/40 rounded-xl border border-dark-700/50">
+                        <p className="text-sm font-medium text-dark-300 mb-2">🤝 AI 합의 의견</p>
+                        <p className="text-xs text-dark-400 leading-relaxed whitespace-pre-line">
+                          {detailData.consensusSummary}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <p className="text-5xl mb-4">📭</p>
+                    <p className="text-dark-400">해당 날짜의 분석 데이터가 없습니다.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </>
   );
