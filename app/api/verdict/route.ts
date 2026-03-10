@@ -44,17 +44,29 @@ const STOCK_NAMES: Record<string, string> = {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const dateParam = searchParams.get('date');
-  
-  // 날짜 파라미터가 있으면 해당 날짜, 없으면 오늘
-  const targetDate = dateParam || new Date().toISOString().split('T')[0];
-  
+
+  // 날짜 파라미터가 있으면 해당 날짜, 없으면 KST 기준 오늘
+  let targetDate: string;
+  if (dateParam) {
+    targetDate = dateParam;
+  } else {
+    const now = new Date();
+    const kstOffset = 9 * 60;
+    const kstTime = new Date(now.getTime() + (kstOffset + now.getTimezoneOffset()) * 60 * 1000);
+    targetDate = kstTime.toISOString().split('T')[0];
+  }
+
   try {
-    // 1. DB에서 해당 날짜의 verdict 조회 (실제 AI 분석 데이터만)
-    const { data: verdict, error } = await supabase
+    // 1. DB에서 해당 날짜의 verdict 조회 (여러 슬롯 가능)
+    const { data: verdictRows, error } = await supabase
       .from('verdicts')
       .select('*')
       .eq('date', targetDate)
-      .single();
+      .order('created_at', { ascending: false });
+
+    // slot이 있는 레코드 우선 (null slot = 레거시 데이터)
+    const validRows = verdictRows?.filter(r => r.slot) || [];
+    const verdict = validRows[0] || verdictRows?.[0];
 
     // DB에 데이터가 없으면 에러 반환 (더미 데이터 없음)
     if (error || !verdict?.top5 || verdict.top5.length === 0) {
@@ -66,24 +78,24 @@ export async function GET(request: NextRequest) {
         top5: [],
       }, { status: 404 });
     }
-    
+
     const top5 = verdict.top5;
-    
+
     // 2. 실시간 가격 조회
     const symbols = top5.map((item: any) => item.symbol);
     let realTimePrices: Map<string, any> = new Map();
-    
+
     try {
       realTimePrices = await fetchMultipleStockPrices(symbols);
     } catch (error) {
       console.error('Failed to fetch real-time prices:', error);
     }
-    
+
     // 3. 실시간 가격 병합
     const top5WithPrices = top5.map((item: any, idx: number) => {
       const realPrice = realTimePrices.get(item.symbol);
       const stockName = STOCK_NAMES[item.symbol] || item.name;
-      
+
       return {
         rank: item.rank || idx + 1,
         symbolId: String(idx + 1),
@@ -100,20 +112,20 @@ export async function GET(request: NextRequest) {
         changePercent: realPrice?.changePercent || item.changePercent || 0,
       };
     });
-    
+
     const targetDateObj = new Date(targetDate + 'T00:00:00');
     const dateStr = targetDateObj.toLocaleDateString('ko-KR', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
-    
+
     const now = new Date();
     const timeStr = now.toLocaleTimeString('ko-KR', {
       hour: '2-digit',
       minute: '2-digit',
     });
-    
+
     return NextResponse.json({
       success: true,
       isRealTime: realTimePrices.size > 0,
@@ -125,10 +137,10 @@ export async function GET(request: NextRequest) {
       rationale: verdict?.consensus_summary || 'AI 분석가들이 선정한 오늘의 Top 5 종목입니다.',
       top5: top5WithPrices,
     });
-    
+
   } catch (error: any) {
     console.error('Verdict API error:', error);
-    
+
     return NextResponse.json({
       success: false,
       error: 'AI 분석 데이터를 가져오는데 실패했습니다.',
