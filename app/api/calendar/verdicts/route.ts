@@ -147,14 +147,14 @@ export async function GET(request: NextRequest) {
       consensus_summary?: string;
     }
 
-    // date + slot 별로 행 조회 (오전 8시·정오 두 시점). 마이그레이션 010 필요
+    // date 별로 행 조회 (slot 컬럼은 없을 수도 있음)
     const { data, error } = await supabase
       .from('verdicts')
-      .select('date, slot, top5, consensus_summary')
+      .select('*')
       .gte('date', startDate)
       .lte('date', endDate)
       .order('date', { ascending: true })
-      .order('slot', { ascending: true });
+      .order('created_at', { ascending: true });
 
     if (error) {
       console.error('Supabase query error:', error);
