@@ -404,22 +404,36 @@ export async function GET(request: NextRequest) {
       .select('*')
       .eq('date', today);
 
-    const existingVerdict = existingVerdicts?.find(v => v.slot === slot) || existingVerdicts?.[0];
+    // 이 슬롯과 정확히 일치하는 기존 레코드만 "이미 존재"로 판단
+    const exactSlotMatch = existingVerdicts?.find(v => v.slot === slot);
+    // null slot 레거시 레코드
+    const legacyRecords = existingVerdicts?.filter(v => !v.slot) || [];
 
-    if (existingVerdict && !force) {
+    if (exactSlotMatch && !force) {
       console.log(`[${today}] [${slot}] Verdict already exists`);
       return NextResponse.json({
         success: true,
         message: `Verdict already exists for ${today} (${slot})`,
-        verdict: existingVerdict
+        verdict: exactSlotMatch
       });
     }
 
-    if (existingVerdicts?.length && force) {
+    // 기존 레코드 삭제: force일 때는 전체, 아닐 때는 null-slot 레거시만 삭제
+    if (force && existingVerdicts?.length) {
       console.log(`[${today}] [${slot}] Force regeneration - deleting ${existingVerdicts.length} existing record(s)...`);
-      // 해당 날짜의 모든 verdict 삭제 (null slot 포함)
       await supabase.from('verdicts').delete().eq('date', today);
-      // predictions는 verdict_id CASCADE로 자동 삭제됨
+    } else {
+      // null slot 레거시 데이터는 항상 정리
+      if (legacyRecords.length > 0) {
+        console.log(`[${today}] Cleaning up ${legacyRecords.length} legacy null-slot record(s)...`);
+        for (const rec of legacyRecords) {
+          await supabase.from('verdicts').delete().eq('id', rec.id);
+        }
+      }
+      // force 아닌 경우 해당 슬롯 기존 데이터 삭제
+      if (exactSlotMatch) {
+        await supabase.from('verdicts').delete().eq('id', exactSlotMatch.id);
+      }
     }
 
     // 2. 테마에 맞는 종목 필터링
