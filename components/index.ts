@@ -24,3 +24,8 @@ export { UrgentAlertBanner } from './UrgentAlertBanner';
 export { default as ShareButtons } from './ShareButtons';
 export { RecommendationCalendar } from './RecommendationCalendar';
 export { NotificationBell } from './NotificationBell';
+export { DebateTranscript } from './DebateTranscript';// 어필리에이트 시스템
+export { ReferralCodeInput } from './ReferralCodeInput';
+export { OperatorDashboard } from './OperatorDashboard';
+export { OperatorRegisterForm } from './OperatorRegisterForm';
+export { AdminOperatorPanel } from './AdminOperatorPanel';

@@ -88,6 +88,13 @@ export default function AdminPage() {
   });
   const [forceRegenerate, setForceRegenerate] = useState(false);
 
+  // OpenRouter / Verdict 진단
+  const [openRouterStatus, setOpenRouterStatus] = useState<any>(null);
+  const [openRouterLoading, setOpenRouterLoading] = useState(false);
+  const [verdictStatus, setVerdictStatus] = useState<any>(null);
+  const [verdictStatusLoading, setVerdictStatusLoading] = useState(false);
+  const [verdictCronLoading, setVerdictCronLoading] = useState(false);
+
   // 관리자 권한 체크
   const userIsAdmin = isAdmin(user?.email);
 
@@ -164,6 +171,59 @@ export default function AdminPage() {
       alert('권한 변경에 실패했습니다.');
     } finally {
       setUpgradeLoading(false);
+    }
+  };
+
+  const fetchOpenRouterStatus = async () => {
+    setOpenRouterLoading(true);
+    setOpenRouterStatus(null);
+    try {
+      const res = await fetch('/api/admin/openrouter-status', {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      const data = await res.json();
+      setOpenRouterStatus(data);
+    } catch (e) {
+      setOpenRouterStatus({ ok: false, error: String(e) });
+    } finally {
+      setOpenRouterLoading(false);
+    }
+  };
+
+  const fetchVerdictStatus = async () => {
+    setVerdictStatusLoading(true);
+    setVerdictStatus(null);
+    try {
+      const res = await fetch('/api/admin/verdict-status?limit=30', {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      const data = await res.json();
+      setVerdictStatus(data);
+    } catch (e) {
+      setVerdictStatus({ success: false, error: String(e) });
+    } finally {
+      setVerdictStatusLoading(false);
+    }
+  };
+
+  const runVerdictCronNow = async () => {
+    setVerdictCronLoading(true);
+    try {
+      const res = await fetch('/api/admin/run-verdict-cron', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setVerdictStatus((prev: any) => prev ? { ...prev, message: `방금 생성됨: ${data.date} (${data.message})` } : null);
+        await fetchVerdictStatus();
+      } else {
+        alert(data.error || '실행 실패');
+      }
+    } catch (e) {
+      alert('요청 실패: ' + String(e));
+    } finally {
+      setVerdictCronLoading(false);
     }
   };
 
@@ -594,11 +654,92 @@ export default function AdminPage() {
                     <div className="flex items-center gap-4 text-xs text-dark-400">
                       <span className="flex items-center gap-1">
                         <CalendarIcon className="w-3 h-3" />
-                        자동 실행: 매일 오전 8시 (KST)
+                        자동 실행: 매일 오전 8시·정오 (KST)
                       </span>
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* OpenRouter / Verdict 진단 */}
+              <div className="bg-dark-900/80 border border-dark-800 rounded-xl p-6">
+                <h3 className="text-lg font-bold text-white mb-4">AI 분석 진단 (결과가 며칠째 같을 때)</h3>
+                <div className="flex flex-wrap gap-3 mb-4">
+                  <button
+                    type="button"
+                    onClick={fetchOpenRouterStatus}
+                    disabled={openRouterLoading}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg"
+                  >
+                    {openRouterLoading ? '확인 중...' : 'OpenRouter 키·크레딧 확인'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={fetchVerdictStatus}
+                    disabled={verdictStatusLoading}
+                    className="px-4 py-2 bg-slate-600 hover:bg-slate-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg"
+                  >
+                    {verdictStatusLoading ? '조회 중...' : 'Verdict 최근 이력 조회'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={runVerdictCronNow}
+                    disabled={verdictCronLoading}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg"
+                  >
+                    {verdictCronLoading ? '실행 중...' : '오늘 추천 지금 재생성 (force)'}
+                  </button>
+                </div>
+                {openRouterStatus && (
+                  <div className="mb-4 p-4 rounded-lg bg-dark-800 border border-dark-700">
+                    <p className="text-dark-300 font-medium mb-2">OpenRouter 상태</p>
+                    {openRouterStatus.keyWorks !== undefined && (
+                      <p className="text-sm">
+                        키 동작: <span className={openRouterStatus.keyWorks ? 'text-emerald-400' : 'text-red-400'}>
+                          {openRouterStatus.keyWorks ? '정상' : '실패'}
+                        </span>
+                        {openRouterStatus.credits && (
+                          <> · 크레딧: {openRouterStatus.credits.total_credits ?? '-'} (사용: {openRouterStatus.credits.total_usage ?? '-'})</>
+                        )}
+                        {openRouterStatus.creditsError && (
+                          <span className="text-dark-500"> · 크레딧 조회: {openRouterStatus.creditsError}</span>
+                        )}
+                        {openRouterStatus.testError && (
+                          <span className="text-red-400"> · 테스트 오류: {openRouterStatus.testError}</span>
+                        )}
+                        {openRouterStatus.hint && (
+                          <span className="block mt-1 text-amber-400/90 text-xs">{openRouterStatus.hint}</span>
+                        )}
+                      </p>
+                    )}
+                    {openRouterStatus.error && (
+                      <p className="text-sm text-red-400">{openRouterStatus.error}</p>
+                    )}
+                  </div>
+                )}
+                {verdictStatus && (
+                  <div className="p-4 rounded-lg bg-dark-800 border border-dark-700">
+                    <p className="text-dark-300 font-medium mb-2">Verdict 이력</p>
+                    <p className="text-sm text-dark-400 mb-2">
+                      총 {verdictStatus.totalCount ?? 0}건 · 서로 다른 날짜 {verdictStatus.uniqueDates ?? 0}일
+                      {verdictStatus.dateRange && (
+                        <> · 기간: {verdictStatus.dateRange.first} ~ {verdictStatus.dateRange.last}</>
+                      )}
+                    </p>
+                    {verdictStatus.message && (
+                      <p className="text-amber-400/90 text-xs mb-2">{verdictStatus.message}</p>
+                    )}
+                    {verdictStatus.verdicts?.length > 0 && (
+                      <ul className="text-xs text-dark-500 space-y-1 max-h-40 overflow-y-auto">
+                        {verdictStatus.verdicts.slice(0, 15).map((v: any) => (
+                          <li key={v.id}>
+                            {v.date} {v.slot ? `(${v.slot})` : ''} · {v.created_at?.slice(0, 19) || '-'}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* 토론 생성 컨트롤 */}

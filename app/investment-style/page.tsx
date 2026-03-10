@@ -515,6 +515,47 @@ export default function InvestmentStylePage() {
                       </div>
                     ) : recommendations ? (
                       <div className="space-y-4">
+                        {/* 변동성 선호도 정보 표시 */}
+                        {recommendations.volatilityInfo && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={`card p-4 mb-4 ${
+                              recommendations.volatilityInfo.preference === 'high'
+                                ? 'border-red-500/50 bg-red-500/5'
+                                : recommendations.volatilityInfo.preference === 'low'
+                                ? 'border-emerald-500/50 bg-emerald-500/5'
+                                : 'border-blue-500/50 bg-blue-500/5'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className="text-2xl">
+                                {recommendations.volatilityInfo.preference === 'high' ? '🔥' :
+                                 recommendations.volatilityInfo.preference === 'low' ? '🛡️' : '📊'}
+                              </span>
+                              <div>
+                                <p className="font-medium text-dark-100">
+                                  {recommendations.volatilityInfo.preference === 'high' ? '공격적 투자 성향' :
+                                   recommendations.volatilityInfo.preference === 'low' ? '안정적 투자 성향' : '균형 투자 성향'}
+                                </p>
+                                <p className="text-sm text-dark-400">{recommendations.volatilityInfo.description}</p>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+
+                        {/* 경고 메시지 (공격적 투자자용) */}
+                        {recommendations.disclaimer && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 mb-4"
+                          >
+                            <p className="text-amber-400 text-sm">{recommendations.disclaimer}</p>
+                          </motion.div>
+                        )}
+
+                        {/* 추천 종목 리스트 */}
                         {recommendations.recommendations?.map((rec: any, idx: number) => (
                           <motion.div
                             key={rec.heroId}
@@ -530,18 +571,70 @@ export default function InvestmentStylePage() {
                                   <span className="font-bold text-dark-100">{rec.heroName}</span>
                                   <span className="text-dark-500 text-sm">추천</span>
                                 </div>
-                                <div className="flex items-center gap-3 mb-2">
+                                <div className="flex flex-wrap items-center gap-2 mb-3">
                                   <span className="text-lg font-bold text-brand-400">{rec.stockName}</span>
                                   <span className="text-dark-400">{rec.stockSymbol}</span>
                                   <span className="px-2 py-0.5 bg-dark-700 rounded text-xs text-dark-400">
                                     {rec.sector}
                                   </span>
+                                  {rec.market && (
+                                    <span className={`px-2 py-0.5 rounded text-xs ${
+                                      rec.market === 'US' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'
+                                    }`}>
+                                      {rec.market === 'US' ? '🇺🇸 미국' : '🇰🇷 한국'}
+                                    </span>
+                                  )}
                                 </div>
+
+                                {/* 변동성 정보 표시 */}
+                                {rec.volatilityLabel && (
+                                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                                    <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
+                                      rec.volatility === 'extreme' ? 'bg-red-500/20 text-red-400' :
+                                      rec.volatility === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                                      rec.volatility === 'medium' ? 'bg-blue-500/20 text-blue-400' :
+                                      'bg-emerald-500/20 text-emerald-400'
+                                    }`}>
+                                      {rec.volatilityLabel}
+                                    </span>
+                                    {rec.beta && (
+                                      <span className="text-xs text-dark-500">
+                                        베타 {rec.beta}
+                                      </span>
+                                    )}
+                                    {rec.avgDailyMove && (
+                                      <span className="text-xs text-dark-500">
+                                        일평균 ±{rec.avgDailyMove}%
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+
                                 <p className="text-dark-300 text-sm mb-2">{rec.reason}</p>
+                                
+                                {/* 위험 경고 표시 */}
+                                {rec.riskWarning && (
+                                  <p className="text-xs text-amber-400/80 bg-amber-500/10 px-2 py-1 rounded mb-2">
+                                    ⚠️ {rec.riskWarning}
+                                  </p>
+                                )}
+
                                 <div className="flex items-center gap-4 text-sm">
                                   <span className="text-dark-500">
                                     적합도: <span className="text-brand-400 font-bold">{rec.matchScore}%</span>
                                   </span>
+                                  {rec.riskLevel && (
+                                    <span className="text-dark-500">
+                                      위험도: 
+                                      <span className="ml-1">
+                                        {Array(5).fill(0).map((_, i) => (
+                                          <span key={i} className={i < rec.riskLevel ? 'text-red-400' : 'text-dark-700'}>
+                                            ●
+                                          </span>
+                                        ))}
+                                      </span>
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </div>
