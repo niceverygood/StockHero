@@ -196,10 +196,10 @@ JSON 형식으로만 응답:
       2048
     );
     return parseTop5FromResponse(text);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Claude (OpenRouter) error:', error);
+    throw new Error(`Claude failed: ${error.message}`);
   }
-  return [];
 }
 
 // Gemini 분석
@@ -228,10 +228,10 @@ JSON 형식으로만 응답:
       2048
     );
     return parseTop5FromResponse(text);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Gemini (OpenRouter) error:', error);
+    throw new Error(`Gemini failed: ${error.message}`);
   }
-  return [];
 }
 
 // GPT 분석
@@ -260,10 +260,10 @@ JSON 형식으로만 응답:
       2048
     );
     return parseTop5FromResponse(text);
-  } catch (error) {
+  } catch (error: any) {
     console.error('GPT (OpenRouter) error:', error);
+    throw new Error(`GPT failed: ${error.message}`);
   }
-  return [];
 }
 
 // 점수 합산 및 Top 5 선정
@@ -455,9 +455,22 @@ export async function GET(request: NextRequest) {
     // 4. 각 AI 분석 수행 (순차 실행 - OpenRouter 동시 요청 제한 방지)
     console.log(`[${today}] Running AI analysis with theme: ${todayTheme.name}...`);
     const aiErrors: string[] = [];
-    const claudeTop5 = await analyzeWithClaude(targetStocks, realPrices, todayTheme).catch(e => { aiErrors.push(`Claude: ${e.message}`); return []; });
-    const geminiTop5 = await analyzeWithGemini(targetStocks, realPrices, todayTheme).catch(e => { aiErrors.push(`Gemini: ${e.message}`); return []; });
-    const gptTop5 = await analyzeWithGPT(targetStocks, realPrices, todayTheme).catch(e => { aiErrors.push(`GPT: ${e.message}`); return []; });
+    const aiRawResponses: string[] = [];
+
+    const captureAnalysis = async (name: string, fn: () => Promise<any[]>) => {
+      try {
+        const result = await fn();
+        if (result.length === 0) aiRawResponses.push(`${name}: returned 0 items`);
+        return result;
+      } catch (e: any) {
+        aiErrors.push(`${name}: ${e.message}`);
+        return [];
+      }
+    };
+
+    const claudeTop5 = await captureAnalysis('Claude', () => analyzeWithClaude(targetStocks, realPrices, todayTheme));
+    const geminiTop5 = await captureAnalysis('Gemini', () => analyzeWithGemini(targetStocks, realPrices, todayTheme));
+    const gptTop5 = await captureAnalysis('GPT', () => analyzeWithGPT(targetStocks, realPrices, todayTheme));
 
     console.log(`[${today}] Claude: ${claudeTop5.length}, Gemini: ${geminiTop5.length}, GPT: ${gptTop5.length}`);
 
