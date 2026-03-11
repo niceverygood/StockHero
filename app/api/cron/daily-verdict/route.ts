@@ -454,10 +454,11 @@ export async function GET(request: NextRequest) {
 
     // 4. 각 AI 분석 수행 (병렬) - 테마 정보 전달
     console.log(`[${today}] Running AI analysis with theme: ${todayTheme.name}...`);
+    const aiErrors: string[] = [];
     const [claudeTop5, geminiTop5, gptTop5] = await Promise.all([
-      analyzeWithClaude(targetStocks, realPrices, todayTheme),
-      analyzeWithGemini(targetStocks, realPrices, todayTheme),
-      analyzeWithGPT(targetStocks, realPrices, todayTheme),
+      analyzeWithClaude(targetStocks, realPrices, todayTheme).catch(e => { aiErrors.push(`Claude: ${e.message}`); return []; }),
+      analyzeWithGemini(targetStocks, realPrices, todayTheme).catch(e => { aiErrors.push(`Gemini: ${e.message}`); return []; }),
+      analyzeWithGPT(targetStocks, realPrices, todayTheme).catch(e => { aiErrors.push(`GPT: ${e.message}`); return []; }),
     ]);
 
     console.log(`[${today}] Claude: ${claudeTop5.length}, Gemini: ${geminiTop5.length}, GPT: ${gptTop5.length}`);
@@ -466,7 +467,7 @@ export async function GET(request: NextRequest) {
     const top5 = aggregateTop5(claudeTop5, geminiTop5, gptTop5, realPrices, todayTheme);
 
     if (top5.length === 0) {
-      throw new Error('Failed to generate Top 5');
+      throw new Error(`Failed to generate Top 5. Claude=${claudeTop5.length}, Gemini=${geminiTop5.length}, GPT=${gptTop5.length}. Errors: ${aiErrors.join('; ') || 'AI returned empty/unparseable results'}`);
     }
 
     // 6. Verdict 저장 (각 AI별 개별 Top 5 포함)
