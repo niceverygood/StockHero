@@ -452,14 +452,12 @@ export async function GET(request: NextRequest) {
       console.error('Failed to fetch prices:', error);
     }
 
-    // 4. 각 AI 분석 수행 (병렬) - 테마 정보 전달
+    // 4. 각 AI 분석 수행 (순차 실행 - OpenRouter 동시 요청 제한 방지)
     console.log(`[${today}] Running AI analysis with theme: ${todayTheme.name}...`);
     const aiErrors: string[] = [];
-    const [claudeTop5, geminiTop5, gptTop5] = await Promise.all([
-      analyzeWithClaude(targetStocks, realPrices, todayTheme).catch(e => { aiErrors.push(`Claude: ${e.message}`); return []; }),
-      analyzeWithGemini(targetStocks, realPrices, todayTheme).catch(e => { aiErrors.push(`Gemini: ${e.message}`); return []; }),
-      analyzeWithGPT(targetStocks, realPrices, todayTheme).catch(e => { aiErrors.push(`GPT: ${e.message}`); return []; }),
-    ]);
+    const claudeTop5 = await analyzeWithClaude(targetStocks, realPrices, todayTheme).catch(e => { aiErrors.push(`Claude: ${e.message}`); return []; });
+    const geminiTop5 = await analyzeWithGemini(targetStocks, realPrices, todayTheme).catch(e => { aiErrors.push(`Gemini: ${e.message}`); return []; });
+    const gptTop5 = await analyzeWithGPT(targetStocks, realPrices, todayTheme).catch(e => { aiErrors.push(`GPT: ${e.message}`); return []; });
 
     console.log(`[${today}] Claude: ${claudeTop5.length}, Gemini: ${geminiTop5.length}, GPT: ${gptTop5.length}`);
 
