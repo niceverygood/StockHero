@@ -1,5 +1,5 @@
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 300;
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchMultipleStockPrices } from '@/lib/market-data/kis';
@@ -452,25 +452,18 @@ export async function GET(request: NextRequest) {
       console.error('Failed to fetch prices:', error);
     }
 
-    // 4. 각 AI 분석 수행 (순차 실행 - OpenRouter 동시 요청 제한 방지)
+    // 4. 각 AI 분석 수행 (병렬 실행)
     console.log(`[${today}] Running AI analysis with theme: ${todayTheme.name}...`);
     const aiErrors: string[] = [];
-    const aiRawResponses: string[] = [];
 
-    const captureAnalysis = async (name: string, fn: () => Promise<any[]>) => {
-      try {
-        const result = await fn();
-        if (result.length === 0) aiRawResponses.push(`${name}: returned 0 items`);
-        return result;
-      } catch (e: any) {
-        aiErrors.push(`${name}: ${e.message}`);
-        return [];
-      }
-    };
+    const wrap = (name: string, fn: () => Promise<any[]>) =>
+      fn().catch((e: any) => { aiErrors.push(`${name}: ${e.message}`); return [] as any[]; });
 
-    const claudeTop5 = await captureAnalysis('Claude', () => analyzeWithClaude(targetStocks, realPrices, todayTheme));
-    const geminiTop5 = await captureAnalysis('Gemini', () => analyzeWithGemini(targetStocks, realPrices, todayTheme));
-    const gptTop5 = await captureAnalysis('GPT', () => analyzeWithGPT(targetStocks, realPrices, todayTheme));
+    const [claudeTop5, geminiTop5, gptTop5] = await Promise.all([
+      wrap('Claude', () => analyzeWithClaude(targetStocks, realPrices, todayTheme)),
+      wrap('Gemini', () => analyzeWithGemini(targetStocks, realPrices, todayTheme)),
+      wrap('GPT', () => analyzeWithGPT(targetStocks, realPrices, todayTheme)),
+    ]);
 
     console.log(`[${today}] Claude: ${claudeTop5.length}, Gemini: ${geminiTop5.length}, GPT: ${gptTop5.length}`);
 
