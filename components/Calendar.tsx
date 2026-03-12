@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Lock } from 'lucide-react';
+import { Lock, X, TrendingUp, Award, ChevronRight } from 'lucide-react';
 import { CharacterAvatar } from './CharacterAvatar';
 import { CHARACTERS } from '@/lib/characters';
 import type { CharacterType } from '@/lib/types';
@@ -70,12 +70,35 @@ const SECTOR_MAP: Record<string, string> = {
   '화학': 'chemical',
 };
 
+function getScoreColor(score: number) {
+  if (score >= 4.5) return 'text-emerald-400';
+  if (score >= 4.0) return 'text-green-400';
+  if (score >= 3.5) return 'text-yellow-400';
+  return 'text-orange-400';
+}
+
+function getScoreBgColor(score: number) {
+  if (score >= 4.5) return 'bg-emerald-500/15 border-emerald-500/30';
+  if (score >= 4.0) return 'bg-green-500/15 border-green-500/30';
+  if (score >= 3.5) return 'bg-yellow-500/15 border-yellow-500/30';
+  return 'bg-orange-500/15 border-orange-500/30';
+}
+
+function getRankBadge(rank: number) {
+  if (rank === 1) return 'bg-gradient-to-br from-amber-400 to-amber-600 text-black';
+  if (rank === 2) return 'bg-gradient-to-br from-slate-300 to-slate-500 text-black';
+  if (rank === 3) return 'bg-gradient-to-br from-amber-600 to-amber-800 text-white';
+  return 'bg-dark-700 text-dark-300';
+}
+
 export function Calendar({ onDateSelect }: CalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [verdicts, setVerdicts] = useState<Record<string, DailyVerdict>>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [modalVerdict, setModalVerdict] = useState<DailyVerdict | null>(null);
 
   // 구독 정보
   const { planName, isPremium, isVip } = useCurrentPlan();
@@ -97,7 +120,7 @@ export function Calendar({ onDateSelect }: CalendarProps) {
 
     const targetDate = new Date(dateStr);
     targetDate.setHours(0, 0, 0, 0);
-    
+
     const todayTime = new Date();
     todayTime.setHours(0, 0, 0, 0);
 
@@ -116,11 +139,26 @@ export function Calendar({ onDateSelect }: CalendarProps) {
     fetchMonthVerdicts();
   }, [currentMonth]);
 
+  // ESC 키로 모달 닫기
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeDetailModal();
+    };
+    if (showDetailModal) {
+      document.addEventListener('keydown', handleEsc);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.removeEventListener('keydown', handleEsc);
+      document.body.style.overflow = 'unset';
+    };
+  }, [showDetailModal]);
+
   async function fetchMonthVerdicts() {
     setLoading(true);
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth() + 1;
-    
+
     try {
       const res = await fetch(`/api/calendar/verdicts?year=${year}&month=${month}`);
       const data = await res.json();
@@ -161,7 +199,7 @@ export function Calendar({ onDateSelect }: CalendarProps) {
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
     const startingDay = firstDay.getDay();
-    
+
     return { daysInMonth, startingDay };
   }
 
@@ -175,10 +213,21 @@ export function Calendar({ onDateSelect }: CalendarProps) {
       setShowUpgradeModal(true);
       return;
     }
-    
+
     setSelectedDate(dateStr);
     const verdict = verdicts[dateStr] || null;
     onDateSelect?.(dateStr, verdict);
+
+    // 해당 날짜에 데이터가 있으면 모달 열기
+    if (verdict && verdict.top5.length > 0) {
+      setModalVerdict(verdict);
+      setShowDetailModal(true);
+    }
+  }
+
+  function closeDetailModal() {
+    setShowDetailModal(false);
+    setModalVerdict(null);
   }
 
   function prevMonth() {
@@ -240,7 +289,7 @@ export function Calendar({ onDateSelect }: CalendarProps) {
             `} />
           )}
         </div>
-        
+
         {verdict && (
           <div className={`space-y-0 sm:space-y-0.5 overflow-hidden ${isLocked ? 'blur-sm' : ''}`}>
             {verdict.top5.slice(0, 3).map((item, i) => (
@@ -305,9 +354,8 @@ export function Calendar({ onDateSelect }: CalendarProps) {
         {dayNames.map((name, i) => (
           <div
             key={name}
-            className={`text-center text-xs sm:text-sm font-medium py-1 sm:py-2 ${
-              i === 0 ? 'text-rose-400' : i === 6 ? 'text-blue-400' : 'text-dark-500'
-            }`}
+            className={`text-center text-xs sm:text-sm font-medium py-1 sm:py-2 ${i === 0 ? 'text-rose-400' : i === 6 ? 'text-blue-400' : 'text-dark-500'
+              }`}
           >
             {name}
           </div>
@@ -327,14 +375,21 @@ export function Calendar({ onDateSelect }: CalendarProps) {
         </div>
       )}
 
+      {/* 날짜 클릭 안내 */}
+      <div className="mt-3 sm:mt-4 text-center">
+        <p className="text-2xs sm:text-xs text-dark-600">
+          📅 날짜를 클릭하면 상세 내용을 확인할 수 있습니다
+        </p>
+      </div>
+
       {/* 구독 등급별 접근 안내 */}
       {planName === 'free' && (
         <div className="mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
           <div className="flex items-center gap-2">
             <Lock className="w-4 h-4 text-amber-400" />
             <p className="text-xs text-amber-300">
-              무료 회원은 오늘 데이터만 확인 가능합니다. 
-              <button 
+              무료 회원은 오늘 데이터만 확인 가능합니다.
+              <button
                 onClick={() => setShowUpgradeModal(true)}
                 className="ml-1 text-amber-400 hover:underline font-medium"
               >
@@ -345,6 +400,187 @@ export function Calendar({ onDateSelect }: CalendarProps) {
           </div>
         </div>
       )}
+
+      {/* ===== 날짜 상세 모달 ===== */}
+      {showDetailModal && modalVerdict && selectedDate && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={closeDetailModal}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fadeIn" />
+
+          {/* Modal Content */}
+          <div
+            className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto bg-dark-900 border border-dark-700 rounded-2xl shadow-2xl animate-slideUp"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              animation: 'slideUp 0.3s ease-out',
+            }}
+          >
+            {/* Header */}
+            <div className="sticky top-0 z-10 bg-dark-900/95 backdrop-blur-sm border-b border-dark-800 p-4 sm:p-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-brand-500/20 to-purple-600/20 flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-brand-400" />
+                  </div>
+                  <div>
+                    <p className="text-base sm:text-lg font-bold text-dark-100">
+                      {new Date(selectedDate + 'T00:00:00+09:00').toLocaleDateString('ko-KR', {
+                        month: 'long',
+                        day: 'numeric',
+                        weekday: 'short',
+                      })}
+                    </p>
+                    <p className="text-xs sm:text-sm text-dark-400">AI Top 5 추천 종목</p>
+                  </div>
+                </div>
+                <button
+                  onClick={closeDetailModal}
+                  className="p-2 hover:bg-dark-800 rounded-xl transition-colors"
+                >
+                  <X className="w-5 h-5 text-dark-400" />
+                </button>
+              </div>
+            </div>
+
+            {/* Body - Top 5 List */}
+            <div className="p-4 sm:p-5 space-y-3">
+              {modalVerdict.top5.map((item, i) => {
+                const hasScores = (item.claudeScore && item.claudeScore > 0) ||
+                  (item.geminiScore && item.geminiScore > 0) ||
+                  (item.gptScore && item.gptScore > 0);
+                const isUnanimous = hasScores &&
+                  (item.claudeScore && item.claudeScore > 0 ? 1 : 0) +
+                  (item.geminiScore && item.geminiScore > 0 ? 1 : 0) +
+                  (item.gptScore && item.gptScore > 0 ? 1 : 0) === 3;
+
+                return (
+                  <div
+                    key={item.symbolCode}
+                    className={`p-3 sm:p-4 rounded-xl border transition-all ${isUnanimous
+                        ? 'bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/30'
+                        : 'bg-dark-800/60 border-dark-700/50 hover:border-dark-600'
+                      }`}
+                  >
+                    {/* Stock Header */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center font-bold text-sm ${getRankBadge(item.rank)}`}>
+                        {item.rank}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-dark-100 truncate text-sm sm:text-base">{item.symbolName}</p>
+                          {isUnanimous && (
+                            <span className="px-1.5 py-0.5 text-[10px] bg-amber-500/20 text-amber-400 rounded-full font-bold shrink-0">
+                              ✨ 만장일치
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-dark-500">
+                          {item.symbolCode}
+                          {item.sector && <span className="ml-1.5 text-dark-600">· {item.sector}</span>}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className={`text-lg sm:text-xl font-bold ${getScoreColor(item.avgScore)}`}>
+                          {item.avgScore.toFixed(1)}
+                        </div>
+                        <div className="text-2xs text-dark-600">평균점수</div>
+                      </div>
+                    </div>
+
+                    {/* AI Individual Scores */}
+                    {hasScores && (
+                      <div className="grid grid-cols-3 gap-2">
+                        {/* Claude */}
+                        <div className={`flex items-center gap-1.5 p-2 rounded-lg ${item.claudeScore && item.claudeScore > 0
+                            ? 'bg-purple-500/15 border border-purple-500/25'
+                            : 'bg-dark-800/40 border border-dark-700/30'
+                          }`}>
+                          <CharacterAvatar character="claude" size="sm" />
+                          <div className="min-w-0">
+                            <p className={`text-xs font-bold ${item.claudeScore && item.claudeScore > 0 ? 'text-purple-400' : 'text-dark-600'}`}>
+                              {item.claudeScore && item.claudeScore > 0 ? item.claudeScore.toFixed(1) : '-'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Gemini */}
+                        <div className={`flex items-center gap-1.5 p-2 rounded-lg ${item.geminiScore && item.geminiScore > 0
+                            ? 'bg-blue-500/15 border border-blue-500/25'
+                            : 'bg-dark-800/40 border border-dark-700/30'
+                          }`}>
+                          <CharacterAvatar character="gemini" size="sm" />
+                          <div className="min-w-0">
+                            <p className={`text-xs font-bold ${item.geminiScore && item.geminiScore > 0 ? 'text-blue-400' : 'text-dark-600'}`}>
+                              {item.geminiScore && item.geminiScore > 0 ? item.geminiScore.toFixed(1) : '-'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* GPT */}
+                        <div className={`flex items-center gap-1.5 p-2 rounded-lg ${item.gptScore && item.gptScore > 0
+                            ? 'bg-emerald-500/15 border border-emerald-500/25'
+                            : 'bg-dark-800/40 border border-dark-700/30'
+                          }`}>
+                          <CharacterAvatar character="gpt" size="sm" />
+                          <div className="min-w-0">
+                            <p className={`text-xs font-bold ${item.gptScore && item.gptScore > 0 ? 'text-emerald-400' : 'text-dark-600'}`}>
+                              {item.gptScore && item.gptScore > 0 ? item.gptScore.toFixed(1) : '-'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Summary Footer */}
+              <div className="pt-3 border-t border-dark-800">
+                <div className="flex items-center justify-between text-xs text-dark-500">
+                  <div className="flex items-center gap-1.5">
+                    <Award className="w-3.5 h-3.5" />
+                    <span>총 {modalVerdict.top5.length}개 종목 추천</span>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-2xs font-medium ${modalVerdict.isGenerated
+                      ? 'bg-emerald-500/10 text-emerald-400'
+                      : 'bg-amber-500/10 text-amber-400'
+                    }`}>
+                    {modalVerdict.isGenerated ? 'AI Generated' : 'Historical'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Global modal animation styles */}
+      <style jsx>{`
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px) scale(0.97);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .animate-slideUp {
+          animation: slideUp 0.3s ease-out;
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out;
+        }
+      `}</style>
 
       {/* 업그레이드 모달 */}
       <UpgradeModal
@@ -439,7 +675,7 @@ export function VerdictDetail({ date, verdict, onGenerateClick, isGenerating }: 
           {isToday ? "오늘의 Top 5 생성하기" : "데이터 없음"}
         </h3>
         <p className="text-dark-500 mb-6">
-          {isToday 
+          {isToday
             ? "AI 3대장이 오늘의 추천 종목을 선정합니다."
             : "이 날짜의 추천 데이터가 없습니다."
           }
@@ -498,8 +734,8 @@ export function VerdictDetail({ date, verdict, onGenerateClick, isGenerating }: 
           {(['claude', 'gemini', 'gpt'] as const).map((charId) => {
             const char = CHARACTERS[charId];
             const score = charId === 'claude' ? selectedStock.claudeScore :
-                         charId === 'gemini' ? selectedStock.geminiScore :
-                         selectedStock.gptScore;
+              charId === 'gemini' ? selectedStock.geminiScore :
+                selectedStock.gptScore;
             return (
               <div key={charId} className={`p-3 rounded-xl ${char.bgColor} border border-current/10`}>
                 <div className="flex items-center gap-2 mb-2">
@@ -614,9 +850,9 @@ export function VerdictDetail({ date, verdict, onGenerateClick, isGenerating }: 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4 sm:mb-6">
         <div className="min-w-0">
           <h3 className="text-sm sm:text-base md:text-lg font-semibold text-dark-100 truncate">
-            {new Date(date).toLocaleDateString('ko-KR', { 
-              year: 'numeric', 
-              month: 'long', 
+            {new Date(date).toLocaleDateString('ko-KR', {
+              year: 'numeric',
+              month: 'long',
               day: 'numeric',
               weekday: 'short'
             })}
@@ -624,8 +860,8 @@ export function VerdictDetail({ date, verdict, onGenerateClick, isGenerating }: 
           <div className="flex items-center gap-2 mt-1">
             <span className={`
               px-2 py-0.5 rounded text-2xs sm:text-xs font-medium shrink-0
-              ${verdict.isGenerated 
-                ? 'bg-emerald-500/10 text-emerald-400' 
+              ${verdict.isGenerated
+                ? 'bg-emerald-500/10 text-emerald-400'
                 : 'bg-amber-500/10 text-amber-400'
               }
             `}>
@@ -644,7 +880,7 @@ export function VerdictDetail({ date, verdict, onGenerateClick, isGenerating }: 
               const sectorId = SECTOR_MAP[item.sector] || 'other';
               return sectorId === sector.id;
             }).length;
-            
+
             return (
               <button
                 key={sector.id}
@@ -684,14 +920,14 @@ export function VerdictDetail({ date, verdict, onGenerateClick, isGenerating }: 
               {/* Rank Badge */}
               <div className={`
                 w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 shrink-0 rounded-lg flex items-center justify-center font-bold text-xs sm:text-sm
-                ${i === 0 ? 'bg-amber-500/20 text-amber-400' : 
-                  i === 1 ? 'bg-gray-400/20 text-gray-400' : 
-                  i === 2 ? 'bg-amber-700/20 text-amber-600' : 
-                  'bg-dark-700 text-dark-400'}
+                ${i === 0 ? 'bg-amber-500/20 text-amber-400' :
+                  i === 1 ? 'bg-gray-400/20 text-gray-400' :
+                    i === 2 ? 'bg-amber-700/20 text-amber-600' :
+                      'bg-dark-700 text-dark-400'}
               `}>
                 {item.rank}
               </div>
-              
+
               {/* Stock Info */}
               <div className="flex-1 min-w-0">
                 <div className="font-medium text-xs sm:text-sm md:text-base text-dark-200 group-hover:text-dark-100 transition-colors truncate">
@@ -703,13 +939,13 @@ export function VerdictDetail({ date, verdict, onGenerateClick, isGenerating }: 
                   <span className="hidden sm:inline truncate">{item.sector}</span>
                 </div>
               </div>
-              
+
               {/* AI Scores Preview - hide on small screens */}
               <div className="hidden lg:flex items-center gap-1 shrink-0">
                 {(['claude', 'gemini', 'gpt'] as const).map((charId) => {
                   const score = charId === 'claude' ? item.claudeScore :
-                               charId === 'gemini' ? item.geminiScore :
-                               item.gptScore;
+                    charId === 'gemini' ? item.geminiScore :
+                      item.gptScore;
                   const char = CHARACTERS[charId];
                   return score ? (
                     <div key={charId} className={`w-5 h-5 md:w-6 md:h-6 rounded flex items-center justify-center text-2xs md:text-xs font-bold ${char.bgColor} ${char.color}`}>
@@ -718,13 +954,13 @@ export function VerdictDetail({ date, verdict, onGenerateClick, isGenerating }: 
                   ) : null;
                 })}
               </div>
-              
+
               {/* Score */}
               <div className="text-right shrink-0">
                 <div className="text-xs sm:text-sm font-semibold text-brand-400 whitespace-nowrap">{item.avgScore.toFixed(1)}</div>
                 <div className="text-2xs sm:text-xs text-dark-500">Score</div>
               </div>
-              
+
               {/* Arrow */}
               <svg className="w-4 h-4 shrink-0 text-dark-600 group-hover:text-dark-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
