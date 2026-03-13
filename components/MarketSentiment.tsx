@@ -58,6 +58,47 @@ const GAUGE_LABELS = [
     { pos: 100, label: '극도의 탐욕' },
 ];
 
+// 지표별 설명 텍스트
+const INDICATOR_TOOLTIPS: Record<string, string> = {
+    'KOSPI': '한국 대표 주가지수. 상승하면 탐욕(매도 신호), 하락하면 공포(매수 기회). 가중치 30%로 가장 큰 영향을 줍니다.',
+    'KOSDAQ': '한국 중소형주 지수. 고위험 성장주 중심이라 변동성이 큽니다. 가중치 15%.',
+    'S&P 500': '미국 대형주 500개 지수. 글로벌 시장의 방향을 결정하는 핵심 지표. 가중치 20%.',
+    'NASDAQ Composite': '미국 기술주 중심 지수. 기술 섹터 흐름과 위험선호도를 나타냅니다. 가중치 15%.',
+    'VIX (공포지수)': '시장 변동성 지수. 높을수록 극도의 불안(공포), 낮을수록 안정(탐욕). 가중치 10%.',
+    'USD/KRW 환율': '원/달러 환율. 상승(원화 약세)이면 외국인 매도 압력 증가로 부정적. 가중치 10%.',
+};
+
+const INDEX_TOOLTIPS: Record<string, string> = {
+    'KOSPI': '코스피: 한국거래소 유가증권시장 상장 대형주의 시가총액 가중 지수입니다.',
+    'KOSDAQ': '코스닥: 한국거래소 코스닥시장의 중소·벤처·기술주 지수입니다.',
+    'S&P 500': 'S&P 500: 미국 시가총액 상위 500개 기업. 글로벌 경제 바로미터.',
+    'NASDAQ': '나스닥 종합: 미국 기술·성장주 중심의 주요 지수입니다.',
+    'VIX 공포지수': 'VIX: 향후 30일 S&P 500 변동성 예상치. 20 이하=안정, 30 이상=공포.',
+    'USD/KRW': 'USD/KRW: 원/달러 환율. 상승 시 외국인 자금 유출 우려가 커집니다.',
+};
+
+// 커스텀 툴팁 컴포넌트
+function Tooltip({ children, text }: { children: React.ReactNode; text: string }) {
+    const [show, setShow] = useState(false);
+    return (
+        <div
+            className="relative inline-flex"
+            onMouseEnter={() => setShow(true)}
+            onMouseLeave={() => setShow(false)}
+        >
+            {children}
+            {show && (
+                <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 px-3 py-2 rounded-lg bg-dark-700 border border-dark-600 shadow-xl shadow-black/40 pointer-events-none animate-in fade-in duration-150">
+                    <p className="text-[11px] text-dark-200 leading-relaxed">{text}</p>
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
+                        <div className="w-2 h-2 rotate-45 bg-dark-700 border-r border-b border-dark-600" />
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 export function MarketSentiment() {
     const [data, setData] = useState<MarketData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -221,10 +262,10 @@ export function MarketSentiment() {
                     {/* 점수 */}
                     <div className="flex-shrink-0 flex flex-col items-center justify-center w-20 rounded-xl bg-dark-800/60 p-3">
                         <span className={`text-3xl font-black tabular-nums ${compositeScore <= 30 ? 'text-blue-400' :
-                                compositeScore <= 45 ? 'text-emerald-400' :
-                                    compositeScore <= 55 ? 'text-dark-200' :
-                                        compositeScore <= 70 ? 'text-amber-400' :
-                                            'text-red-400'
+                            compositeScore <= 45 ? 'text-emerald-400' :
+                                compositeScore <= 55 ? 'text-dark-200' :
+                                    compositeScore <= 70 ? 'text-amber-400' :
+                                        'text-red-400'
                             }`}>
                             {compositeScore}
                         </span>
@@ -243,16 +284,20 @@ export function MarketSentiment() {
 
                 {/* AI 추천 보정 수치 */}
                 <div className="grid grid-cols-2 gap-2.5 mb-2">
-                    <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-3 text-center">
-                        <p className="text-[10px] text-blue-300/70 mb-0.5">AI 5점 종목 → 매수 강도</p>
-                        <p className="text-lg font-black text-blue-400">{adjustment.example5pt}<span className="text-xs font-normal text-blue-400/60">/5.0</span></p>
-                        <p className="text-[10px] text-dark-600 mt-0.5">매수 비중 ×{(adjustment.buyWeight * 100).toFixed(0)}%</p>
-                    </div>
-                    <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-center">
-                        <p className="text-[10px] text-red-300/70 mb-0.5">AI 3점 종목 → 매수 강도</p>
-                        <p className="text-lg font-black text-red-400">{adjustment.example3pt}<span className="text-xs font-normal text-red-400/60">/3.0</span></p>
-                        <p className="text-[10px] text-dark-600 mt-0.5">매도 비중 ×{(adjustment.sellWeight * 100).toFixed(0)}%</p>
-                    </div>
+                    <Tooltip text="AI가 5점(1위)을 준 종목의 현재 시장 상황 반영 매수 강도입니다. 시장 과열 시 5점이어도 매수 강도가 낮아집니다.">
+                        <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-3 text-center cursor-help w-full">
+                            <p className="text-[10px] text-blue-300/70 mb-0.5">AI 5점 종목 → 매수 강도</p>
+                            <p className="text-lg font-black text-blue-400">{adjustment.example5pt}<span className="text-xs font-normal text-blue-400/60">/5.0</span></p>
+                            <p className="text-[10px] text-dark-600 mt-0.5">매수 비중 ×{(adjustment.buyWeight * 100).toFixed(0)}%</p>
+                        </div>
+                    </Tooltip>
+                    <Tooltip text="AI가 3점(3위)을 준 종목의 현재 시장 상황 반영 매수 강도입니다. 시장 공포 시에는 3점 종목도 좋은 매수 기회가 됩니다.">
+                        <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-center cursor-help w-full">
+                            <p className="text-[10px] text-red-300/70 mb-0.5">AI 3점 종목 → 매수 강도</p>
+                            <p className="text-lg font-black text-red-400">{adjustment.example3pt}<span className="text-xs font-normal text-red-400/60">/3.0</span></p>
+                            <p className="text-[10px] text-dark-600 mt-0.5">매도 비중 ×{(adjustment.sellWeight * 100).toFixed(0)}%</p>
+                        </div>
+                    </Tooltip>
                 </div>
             </div>
 
@@ -297,29 +342,34 @@ export function MarketSentiment() {
                     <div>
                         <h4 className="text-sm font-semibold text-dark-300 mb-3">📈 지표별 센티먼트 점수</h4>
                         <div className="space-y-2">
-                            {indicators.map((ind) => (
-                                <div key={ind.name} className="flex items-center gap-3">
-                                    <span className="text-xs text-dark-400 w-28 shrink-0 truncate">{ind.name}</span>
-                                    <div className="flex-1 h-2 rounded-full bg-dark-800 overflow-hidden">
-                                        <div
-                                            className={`h-full rounded-full transition-all duration-700 bg-gradient-to-r ${ind.score <= 30 ? 'from-blue-600 to-blue-400' :
-                                                    ind.score <= 50 ? 'from-emerald-600 to-emerald-400' :
-                                                        ind.score <= 70 ? 'from-yellow-500 to-amber-400' :
-                                                            'from-red-600 to-red-400'
-                                                }`}
-                                            style={{ width: `${ind.score}%` }}
-                                        />
-                                    </div>
-                                    <span className={`text-xs font-bold w-8 text-right tabular-nums ${ind.score <= 30 ? 'text-blue-400' :
-                                            ind.score <= 50 ? 'text-emerald-400' :
-                                                ind.score <= 70 ? 'text-amber-400' :
-                                                    'text-red-400'
-                                        }`}>
-                                        {ind.score}
-                                    </span>
-                                    <span className="text-[10px] text-dark-600 w-8 text-right">{(ind.weight * 100).toFixed(0)}%</span>
-                                </div>
-                            ))}
+                            {indicators.map((ind) => {
+                                const tooltipText = INDICATOR_TOOLTIPS[ind.name] || `${ind.name}: 시장 센티먼트 분석 지표입니다.`;
+                                return (
+                                    <Tooltip key={ind.name} text={`${tooltipText} 현재 ${ind.detail}`}>
+                                        <div className="flex items-center gap-3 w-full cursor-help">
+                                            <span className="text-xs text-dark-400 w-28 shrink-0 truncate">{ind.name}</span>
+                                            <div className="flex-1 h-2 rounded-full bg-dark-800 overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full transition-all duration-700 bg-gradient-to-r ${ind.score <= 30 ? 'from-blue-600 to-blue-400' :
+                                                        ind.score <= 50 ? 'from-emerald-600 to-emerald-400' :
+                                                            ind.score <= 70 ? 'from-yellow-500 to-amber-400' :
+                                                                'from-red-600 to-red-400'
+                                                        }`}
+                                                    style={{ width: `${ind.score}%` }}
+                                                />
+                                            </div>
+                                            <span className={`text-xs font-bold w-8 text-right tabular-nums ${ind.score <= 30 ? 'text-blue-400' :
+                                                ind.score <= 50 ? 'text-emerald-400' :
+                                                    ind.score <= 70 ? 'text-amber-400' :
+                                                        'text-red-400'
+                                                }`}>
+                                                {ind.score}
+                                            </span>
+                                            <span className="text-[10px] text-dark-600 w-8 text-right">{(ind.weight * 100).toFixed(0)}%</span>
+                                        </div>
+                                    </Tooltip>
+                                );
+                            })}
                         </div>
                     </div>
 
@@ -343,14 +393,17 @@ function IndexCard({ name, price, change, invertColor }: { name: string; price: 
     const isPositive = invertColor ? change < 0 : change >= 0;
     const changeColor = isPositive ? 'text-emerald-400' : 'text-red-400';
     const changeBg = isPositive ? 'bg-emerald-500/10' : 'bg-red-500/10';
+    const tooltipText = INDEX_TOOLTIPS[name] || `${name}: 시장 지표입니다.`;
 
     return (
-        <div className={`rounded-lg p-2.5 ${changeBg} border border-dark-700/30`}>
-            <p className="text-[10px] text-dark-500 mb-0.5 truncate">{name}</p>
-            <p className="text-sm font-bold text-dark-200 truncate">{price}</p>
-            <p className={`text-xs font-semibold ${changeColor}`}>
-                {change >= 0 ? '+' : ''}{change.toFixed(2)}%
-            </p>
-        </div>
+        <Tooltip text={tooltipText}>
+            <div className={`rounded-lg p-2.5 ${changeBg} border border-dark-700/30 cursor-help w-full`}>
+                <p className="text-[10px] text-dark-500 mb-0.5 truncate">{name}</p>
+                <p className="text-sm font-bold text-dark-200 truncate">{price}</p>
+                <p className={`text-xs font-semibold ${changeColor}`}>
+                    {change >= 0 ? '+' : ''}{change.toFixed(2)}%
+                </p>
+            </div>
+        </Tooltip>
     );
 }

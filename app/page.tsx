@@ -326,7 +326,7 @@ export default function HomePage() {
                           </p>
                         </div>
                         <div className="w-px h-10 bg-dark-700 mx-1" />
-                        <div className="text-center">
+                        <div className="text-center" title="3개 AI(Claude, Gemini, GPT)의 추천 점수 평균입니다. 5점=1위, 4점=2위, 3점=3위 순으로 부여됩니다.">
                           <p className="text-xs text-dark-500 mb-1">평균</p>
                           <p className={`text-lg font-bold ${getScoreColor(stock.avgScore)}`}>
                             {stock.avgScore.toFixed(1)}
@@ -335,15 +335,18 @@ export default function HomePage() {
                         {marketBuyWeight !== null && (
                           <>
                             <div className="w-px h-10 bg-dark-700 mx-1" />
-                            <div className="text-center min-w-[52px]">
+                            <div
+                              className="text-center min-w-[52px] cursor-help"
+                              title={`시장 타이밍 보정 점수: 평균 ${stock.avgScore.toFixed(1)} × 매수비중 ${(marketBuyWeight * 100).toFixed(0)}% = ${(stock.avgScore * marketBuyWeight).toFixed(1)}. 시장 과열 시 매수 강도가 줄고, 공포 시 매수 강도가 높아집니다. (현재 시장점수: ${marketScore}/100)`}
+                            >
                               <p className="text-[10px] text-brand-400/70 mb-1 whitespace-nowrap">가중 매수</p>
                               <p className={`text-lg font-black ${(() => {
-                                  const w = stock.avgScore * marketBuyWeight;
-                                  if (w >= 3.5) return 'text-emerald-400';
-                                  if (w >= 2.5) return 'text-yellow-400';
-                                  if (w >= 1.5) return 'text-orange-400';
-                                  return 'text-red-400';
-                                })()
+                                const w = stock.avgScore * marketBuyWeight;
+                                if (w >= 3.5) return 'text-emerald-400';
+                                if (w >= 2.5) return 'text-yellow-400';
+                                if (w >= 1.5) return 'text-orange-400';
+                                return 'text-red-400';
+                              })()
                                 }`}>
                                 {(stock.avgScore * marketBuyWeight).toFixed(1)}
                               </p>
