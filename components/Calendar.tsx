@@ -614,11 +614,22 @@ export function Calendar({ onDateSelect }: CalendarProps) {
                                             <div className="flex items-center gap-2 mb-1.5">
                                               <CharacterAvatar character={msg.character as CharacterType} size="sm" />
                                               <span className={`text-xs font-semibold ${cc.text}`}>{msg.characterName}</span>
-                                              {msg.picked ? (
-                                                <span className="ml-auto px-1.5 py-0.5 text-[10px] bg-emerald-500/20 text-emerald-400 rounded font-bold">✅ 추천</span>
-                                              ) : (
-                                                <span className="ml-auto px-1.5 py-0.5 text-[10px] bg-dark-700/50 text-dark-500 rounded">미추천</span>
-                                              )}
+                                              {(() => {
+                                                // 해당 AI의 실제 점수 가져오기
+                                                const aiScore = msg.character === 'claude' ? item.claudeScore
+                                                  : msg.character === 'gemini' ? item.geminiScore
+                                                    : item.gptScore;
+                                                const score = aiScore || 0;
+                                                if (score >= 3) return (
+                                                  <span className="ml-auto px-1.5 py-0.5 text-[10px] bg-emerald-500/20 text-emerald-400 rounded font-bold">✅ 추천 ({score}점)</span>
+                                                );
+                                                if (score >= 1) return (
+                                                  <span className="ml-auto px-1.5 py-0.5 text-[10px] bg-amber-500/20 text-amber-400 rounded font-bold">⚠️ 하위순위 ({score}점)</span>
+                                                );
+                                                return (
+                                                  <span className="ml-auto px-1.5 py-0.5 text-[10px] bg-dark-700/50 text-dark-500 rounded">미추천</span>
+                                                );
+                                              })()}
                                             </div>
                                             <p className="text-xs text-dark-300 leading-relaxed whitespace-pre-wrap">{msg.analysis || '분석 내용 없음'}</p>
                                           </div>

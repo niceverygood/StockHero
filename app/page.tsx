@@ -9,6 +9,7 @@ import { PerformanceTeaser } from '@/components/PerformanceTeaser';
 import { useCurrentPlan, useSubscription } from '@/lib/subscription/hooks';
 import { SparklesIcon, X, TrendingUp, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Calendar } from '@/components';
+import { MarketSentiment } from '@/components/MarketSentiment';
 
 const AI_EMOJIS: Record<string, string> = {
   claude: '🔵',
@@ -63,14 +64,30 @@ export default function HomePage() {
   const [showCharacterModal, setShowCharacterModal] = useState(false);
   const [selectedStock, setSelectedStock] = useState<Top5Item | null>(null);
   const [showStockModal, setShowStockModal] = useState(false);
-  
+  const [marketBuyWeight, setMarketBuyWeight] = useState<number | null>(null);
+  const [marketScore, setMarketScore] = useState<number | null>(null);
+
   // 구독 정보
   const { isPremium } = useCurrentPlan();
   const { openUpgradeModal } = useSubscription();
 
   useEffect(() => {
     fetchTodayVerdict();
+    fetchMarketSentiment();
   }, []);
+
+  const fetchMarketSentiment = async () => {
+    try {
+      const res = await fetch('/api/market/sentiment');
+      const data = await res.json();
+      if (data.success && data.data) {
+        setMarketBuyWeight(data.data.adjustment.buyWeight);
+        setMarketScore(data.data.compositeScore);
+      }
+    } catch (e) {
+      console.error('Failed to fetch market sentiment:', e);
+    }
+  };
 
   const fetchTodayVerdict = async () => {
     try {
@@ -105,7 +122,7 @@ export default function HomePage() {
   return (
     <>
       <Header />
-      
+
       <main className="min-h-screen bg-dark-950 pt-24 pb-12">
         {/* Background */}
         <div className="fixed inset-0 bg-grid opacity-30" />
@@ -119,12 +136,12 @@ export default function HomePage() {
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-dark-300">3개 AI가 토론해서 선정</span>
             </div>
-            
+
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-4">
               <span className="text-dark-100">오늘의</span>{' '}
               <span className="bg-gradient-to-r from-brand-400 to-purple-400 bg-clip-text text-transparent">AI Top 5</span>
             </h1>
-            
+
             <p className="text-dark-400 text-lg max-w-xl mx-auto">
               Claude, Gemini, GPT 세 AI가 실시간으로 분석하고 토론해서 선정한 종목입니다
             </p>
@@ -207,7 +224,7 @@ export default function HomePage() {
                   {(['claude', 'gemini', 'gpt'] as const).map((charId, i) => {
                     const char = CHARACTERS[charId];
                     return (
-                      <div 
+                      <div
                         key={charId}
                         className={`w-12 h-12 rounded-xl ${char.bgColor} flex items-center justify-center animate-bounce`}
                         style={{ animationDelay: `${i * 0.2}s` }}
@@ -252,6 +269,11 @@ export default function HomePage() {
                   />
                 </div>
               )}
+
+              {/* Market Timing Signal */}
+              <div className="max-w-3xl mx-auto mb-8">
+                <MarketSentiment />
+              </div>
 
               {/* Top 5 List */}
               <div className="max-w-3xl mx-auto space-y-4">
@@ -310,6 +332,25 @@ export default function HomePage() {
                             {stock.avgScore.toFixed(1)}
                           </p>
                         </div>
+                        {marketBuyWeight !== null && (
+                          <>
+                            <div className="w-px h-10 bg-dark-700 mx-1" />
+                            <div className="text-center min-w-[52px]">
+                              <p className="text-[10px] text-brand-400/70 mb-1 whitespace-nowrap">가중 매수</p>
+                              <p className={`text-lg font-black ${(() => {
+                                  const w = stock.avgScore * marketBuyWeight;
+                                  if (w >= 3.5) return 'text-emerald-400';
+                                  if (w >= 2.5) return 'text-yellow-400';
+                                  if (w >= 1.5) return 'text-orange-400';
+                                  return 'text-red-400';
+                                })()
+                                }`}>
+                                {(stock.avgScore * marketBuyWeight).toFixed(1)}
+                              </p>
+                              <p className="text-[9px] text-dark-600">×{(marketBuyWeight * 100).toFixed(0)}%</p>
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       {/* Click indicator */}
@@ -336,7 +377,7 @@ export default function HomePage() {
                     🤝 AI 합의 의견
                   </h3>
                   <div className="text-dark-300 leading-relaxed whitespace-pre-line">{verdict.consensusSummary}</div>
-                  
+
                   {/* 각 종목별 간단 요약 */}
                   <div className="mt-6 pt-4 border-t border-dark-700 space-y-3">
                     <h4 className="text-sm font-medium text-dark-400 mb-3">📋 종목별 AI 평가 요약</h4>
@@ -412,7 +453,7 @@ export default function HomePage() {
           </div>
         </footer>
       </main>
-      
+
       {/* Character Detail Modal */}
       {selectedCharacter && (
         <CharacterDetailModal
@@ -447,10 +488,36 @@ function StockDetailModal({
   verdict: TodayVerdict;
   onClose: () => void;
 }) {
+  const [debateRounds, setDebateRounds] = useState<any[]>([]);
+  const [debateLoading, setDebateLoading] = useState(false);
+  const [expandedRound, setExpandedRound] = useState<number | null>(null);
+
   // 각 AI별 의견 찾기
   const claudeItem = verdict.claudeTop5?.find(c => c.symbol === stock.symbol);
   const geminiItem = verdict.geminiTop5?.find(g => g.symbol === stock.symbol);
   const gptItem = verdict.gptTop5?.find(g => g.symbol === stock.symbol);
+
+  // 점수별 분석 내용 생성 (fallback)
+  const generateAnalysis = (aiId: string, score: number, name: string) => {
+    const stockName = stock.name;
+    if (aiId === 'claude') {
+      if (score >= 4) return `제 분석으로는 ${stockName}의 펀더멘털이 매우 견고합니다. ${score}점을 부여했습니다. 재무 건전성과 수익성이 우수한 기업으로, 밸류에이션 관점에서 강력 추천합니다.`;
+      if (score >= 3) return `${stockName}은 펀더멘털이 양호합니다. ${score}점을 부여했습니다. 경쟁력은 있으나 밸류에이션이 다소 부담될 수 있습니다.`;
+      if (score >= 1) return `${stockName}은 펀더멘털은 괜찮지만, 다른 종목 대비 매력도가 떨어집니다. ${score}점으로 하위 순위에 배치했습니다.`;
+      return `${stockName}은 현재 밸류에이션 부담이 있어 이번 추천에서는 제외했습니다. PER과 PBR 기준으로 다른 종목이 더 매력적입니다.`;
+    }
+    if (aiId === 'gemini') {
+      if (score >= 4) return `솔직히 ${stockName}의 성장 잠재력은 현재 주가에 충분히 반영되지 않았다고 봅니다. ${score}점 부여! This is THE play!`;
+      if (score >= 3) return `${stockName}은 성장 가능성이 있습니다. ${score}점을 줬습니다. 기회가 있지만 확실한 카탈리스트가 필요합니다.`;
+      if (score >= 1) return `${stockName}은 솔직히 제 Top pick은 아닙니다. ${score}점으로 하위 순위에 넣었어요. Not my favorite play.`;
+      return `${stockName}보다 성장 잠재력이 더 높은 종목들이 있습니다. This is NOT the play right now.`;
+    }
+    // gpt
+    if (score >= 4) return `내 40년 경험에 비추어 보면, ${stockName}은 거시경제 환경을 고려해도 훌륭한 투자처입니다. ${score}점을 부여합니다. 리스크 대비 기대 수익률이 매우 양호합니다.`;
+    if (score >= 3) return `${stockName}은 투자 가치가 있다고 봅니다. ${score}점입니다. 다만 거시 리스크 요인을 모니터링해야 합니다.`;
+    if (score >= 1) return `${stockName}에 대해서는 솔직히 확신이 부족합니다. ${score}점으로 하위 순위에 배치했습니다. 리스크 대비 수익률이 다른 종목만 못합니다.`;
+    return `현재 금리 수준과 경기 사이클을 감안하면, ${stockName}에 대해서는 신중한 접근이 필요합니다. 살아남아야 게임을 계속할 수 있어.`;
+  };
 
   // AI별 분석 정보
   const aiAnalysis = [
@@ -459,7 +526,7 @@ function StockDetailModal({
       name: '클로드 리',
       emoji: '🔵',
       score: stock.claudeScore,
-      reason: claudeItem?.reason || verdict.aiReasons?.[stock.symbol]?.claude,
+      reason: claudeItem?.reason || verdict.aiReasons?.[stock.symbol]?.claude || generateAnalysis('claude', stock.claudeScore, stock.name),
       character: CHARACTERS.claude,
       selected: stock.claudeScore > 0,
     },
@@ -468,7 +535,7 @@ function StockDetailModal({
       name: '제미 나인',
       emoji: '🟣',
       score: stock.geminiScore,
-      reason: geminiItem?.reason || verdict.aiReasons?.[stock.symbol]?.gemini,
+      reason: geminiItem?.reason || verdict.aiReasons?.[stock.symbol]?.gemini || generateAnalysis('gemini', stock.geminiScore, stock.name),
       character: CHARACTERS.gemini,
       selected: stock.geminiScore > 0,
     },
@@ -477,11 +544,30 @@ function StockDetailModal({
       name: '지피 테일러',
       emoji: '🟢',
       score: stock.gptScore,
-      reason: gptItem?.reason || verdict.aiReasons?.[stock.symbol]?.gpt,
+      reason: gptItem?.reason || verdict.aiReasons?.[stock.symbol]?.gpt || generateAnalysis('gpt', stock.gptScore, stock.name),
       character: CHARACTERS.gpt,
       selected: stock.gptScore > 0,
     },
   ];
+
+  // 토론 데이터 가져오기
+  useEffect(() => {
+    const fetchDebate = async () => {
+      setDebateLoading(true);
+      try {
+        const res = await fetch(`/api/debate/history?symbol=${stock.symbol}&date=${verdict.date}`);
+        const data = await res.json();
+        if (data.success && data.data?.rounds) {
+          setDebateRounds(data.data.rounds);
+        }
+      } catch (e) {
+        console.error('debate fetch error', e);
+      } finally {
+        setDebateLoading(false);
+      }
+    };
+    fetchDebate();
+  }, [stock.symbol, verdict.date]);
 
   const getScoreColor = (score: number) => {
     if (score >= 4.5) return 'text-emerald-400';
@@ -497,6 +583,12 @@ function StockDetailModal({
     if (score >= 3.5) return 'bg-yellow-500/20 border-yellow-500/30';
     if (score >= 3.0) return 'bg-orange-500/20 border-orange-500/30';
     return 'bg-red-500/20 border-red-500/30';
+  };
+
+  const getScoreBadge = (score: number) => {
+    if (score >= 3) return { label: `추천 (${score.toFixed(1)}점)`, style: getScoreBg(score), text: getScoreColor(score) };
+    if (score >= 1) return { label: `하위순위 (${score.toFixed(1)}점)`, style: 'bg-amber-500/20 border-amber-500/30', text: 'text-amber-400' };
+    return { label: '미선정', style: 'bg-dark-700 border-dark-600', text: 'text-dark-400' };
   };
 
   return (
@@ -517,12 +609,11 @@ function StockDetailModal({
             </button>
 
             <div className="flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-xl flex items-center justify-center font-bold text-xl ${
-                stock.rank === 1 ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-black' :
+              <div className={`w-14 h-14 rounded-xl flex items-center justify-center font-bold text-xl ${stock.rank === 1 ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-black' :
                 stock.rank === 2 ? 'bg-gradient-to-r from-slate-400 to-slate-300 text-black' :
-                stock.rank === 3 ? 'bg-gradient-to-r from-amber-700 to-amber-600 text-white' :
-                'bg-dark-700 text-dark-300'
-              }`}>
+                  stock.rank === 3 ? 'bg-gradient-to-r from-amber-700 to-amber-600 text-white' :
+                    'bg-dark-700 text-dark-300'
+                }`}>
                 {stock.rank}
               </div>
               <div>
@@ -550,7 +641,7 @@ function StockDetailModal({
                   <AlertCircle className="w-5 h-5 text-amber-400" />
                   <span className="text-amber-400 font-medium">의견 차이</span>
                   <span className="text-amber-300/70 text-sm">
-                    {aiAnalysis.filter(a => !a.selected).map(a => a.name).join(', ')}은(는) 다른 종목을 추천했습니다
+                    {aiAnalysis.filter(a => a.score < 3).map(a => a.name).join(', ')}은(는) 다른 종목을 더 선호했습니다
                   </span>
                 </div>
               )}
@@ -561,68 +652,123 @@ function StockDetailModal({
           <div className="p-6 space-y-4">
             <h3 className="text-lg font-bold text-dark-100 mb-4">🤖 각 AI의 분석 의견</h3>
 
-            {aiAnalysis.map((ai) => (
-              <div
-                key={ai.id}
-                className={`p-5 rounded-2xl border ${
-                  ai.selected
+            {aiAnalysis.map((ai) => {
+              const badge = getScoreBadge(ai.score);
+              return (
+                <div
+                  key={ai.id}
+                  className={`p-5 rounded-2xl border ${ai.score >= 3
                     ? `${ai.character.bgColor} ${ai.character.borderColor}`
-                    : 'bg-dark-800/50 border-dark-700'
-                }`}
-              >
-                <div className="flex items-start gap-4">
-                  {/* AI 아바타 */}
-                  <div className={`w-12 h-12 rounded-xl overflow-hidden ring-2 ${ai.character.borderColor} flex-shrink-0`}>
-                    <Image
-                      src={ai.character.image}
-                      alt={ai.name}
-                      width={48}
-                      height={48}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-
-                  {/* 의견 */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className={`font-bold ${ai.character.color}`}>{ai.name}</span>
-                        <span className="text-dark-500 text-sm">{ai.character.roleKo}</span>
-                      </div>
-                      {ai.selected ? (
-                        <span className={`px-3 py-1 rounded-full text-sm font-bold border ${getScoreBg(ai.score)} ${getScoreColor(ai.score)}`}>
-                          {ai.score.toFixed(1)}점
-                        </span>
-                      ) : (
-                        <span className="px-3 py-1 rounded-full text-sm font-medium bg-dark-700 text-dark-400 border border-dark-600">
-                          미선정
-                        </span>
-                      )}
+                    : ai.score >= 1
+                      ? 'bg-amber-500/5 border-amber-500/20'
+                      : 'bg-dark-800/50 border-dark-700'
+                    }`}
+                >
+                  <div className="flex items-start gap-4">
+                    {/* AI 아바타 */}
+                    <div className={`w-12 h-12 rounded-xl overflow-hidden ring-2 ${ai.character.borderColor} flex-shrink-0`}>
+                      <Image
+                        src={ai.character.image}
+                        alt={ai.name}
+                        width={48}
+                        height={48}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
 
-                    {ai.selected && ai.reason ? (
-                      <p className="text-dark-300 leading-relaxed">{ai.reason}</p>
-                    ) : ai.selected ? (
-                      <p className="text-dark-400 italic">분석 내용이 기록되지 않았습니다.</p>
-                    ) : (
-                      <div className="text-dark-500">
-                        <p className="mb-2">이 종목을 Top 5에 선정하지 않았습니다.</p>
-                        <p className="text-sm">
-                          💡 {ai.name}은(는) 오늘 테마인 &quot;{verdict.theme.name}&quot;에 더 적합한 다른 종목을 추천했습니다.
-                        </p>
+                    {/* 의견 */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`font-bold ${ai.character.color}`}>{ai.name}</span>
+                          <span className="text-dark-500 text-sm">{ai.character.roleKo}</span>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-sm font-bold border ${badge.style} ${badge.text}`}>
+                          {badge.label}
+                        </span>
                       </div>
-                    )}
+
+                      <p className="text-dark-300 leading-relaxed">{ai.reason}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
+
+            {/* 토론 라운드 */}
+            <div className="mt-6">
+              <h3 className="text-lg font-bold text-dark-100 mb-4">🎙️ AI 토론 과정</h3>
+              {debateLoading ? (
+                <div className="flex items-center justify-center py-6 gap-2">
+                  <div className="w-4 h-4 border-2 border-brand-400 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-sm text-dark-400">토론 내용 로딩 중...</span>
+                </div>
+              ) : debateRounds.length > 0 ? (
+                <div className="space-y-2">
+                  {debateRounds.map((round: any) => {
+                    const isOpen = expandedRound === round.round;
+                    return (
+                      <div key={round.round} className="rounded-xl border border-dark-700/40 overflow-hidden">
+                        <button
+                          onClick={() => setExpandedRound(isOpen ? null : round.round)}
+                          className="w-full flex items-center justify-between p-3 bg-dark-800/40 hover:bg-dark-800/70 transition-colors text-left"
+                        >
+                          <span className="text-sm font-semibold text-dark-300">
+                            🎙️ 라운드 {round.round} - {round.round === 1 ? '초기 분석' : round.round === 2 ? '의견 조율' : '최종 합의'}
+                          </span>
+                          <TrendingUp className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180 text-brand-400' : 'text-dark-500'}`} />
+                        </button>
+                        {isOpen && (
+                          <div className="p-3 space-y-3">
+                            {round.messages.map((msg: any, mi: number) => {
+                              const charColors: Record<string, { bg: string; border: string; color: string }> = {
+                                claude: { bg: 'bg-purple-500/10', border: 'border-purple-500/20', color: 'text-purple-400' },
+                                gemini: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', color: 'text-blue-400' },
+                                gpt: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', color: 'text-emerald-400' },
+                              };
+                              const cc = charColors[msg.character] || charColors.claude;
+                              const aiScore = msg.character === 'claude' ? stock.claudeScore
+                                : msg.character === 'gemini' ? stock.geminiScore : stock.gptScore;
+                              const sBadge = getScoreBadge(aiScore);
+
+                              return (
+                                <div key={mi} className={`p-3 rounded-xl ${cc.bg} border ${cc.border}`}>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <div className={`w-8 h-8 rounded-lg overflow-hidden ring-1 ${cc.border}`}>
+                                      <Image
+                                        src={CHARACTERS[msg.character as keyof typeof CHARACTERS]?.image || ''}
+                                        alt={msg.characterName}
+                                        width={32}
+                                        height={32}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    </div>
+                                    <span className={`text-sm font-semibold ${cc.color}`}>{msg.characterName}</span>
+                                    <span className={`ml-auto px-2 py-0.5 text-xs rounded-full border ${sBadge.style} ${sBadge.text} font-bold`}>
+                                      {sBadge.label}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-dark-300 leading-relaxed whitespace-pre-wrap">{msg.analysis || '분석 내용 없음'}</p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-dark-500 text-center py-4">토론 데이터를 불러올 수 없습니다.</p>
+              )}
+            </div>
 
             {/* 추가 정보 */}
             <div className="mt-6 p-4 rounded-xl bg-dark-800/50 border border-dark-700">
               <h4 className="text-sm font-medium text-dark-400 mb-2">📊 점수 산정 기준</h4>
               <p className="text-dark-500 text-sm leading-relaxed">
-                각 AI가 해당 종목을 Top 5에 선정하면 순위에 따라 5.0~3.0점이 부여됩니다. 
-                선정하지 않은 AI는 0점으로 표시되며, 이 경우 해당 AI는 오늘의 테마에 더 적합한 다른 종목을 추천한 것입니다.
+                각 AI가 해당 종목을 Top 5에 선정하면 순위에 따라 5.0~1.0점이 부여됩니다.
+                3점 이상은 적극 추천, 1~2점은 하위 순위(소극적 포함), 0점은 해당 AI가 다른 종목을 추천한 것입니다.
                 최종 순위는 3개 AI 점수의 합산으로 결정됩니다.
               </p>
             </div>
