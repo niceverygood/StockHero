@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Lock, X, TrendingUp, Award, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Lock, X, TrendingUp, Award, ChevronRight, ChevronDown, MessageCircle, Loader2 } from 'lucide-react';
 import { CharacterAvatar } from './CharacterAvatar';
 import { CHARACTERS } from '@/lib/characters';
 import type { CharacterType } from '@/lib/types';
@@ -91,6 +91,27 @@ function getRankBadge(rank: number) {
   return 'bg-dark-700 text-dark-300';
 }
 
+interface DebateRoundMsg {
+  character: string;
+  characterName: string;
+  picked: boolean;
+  picks: string[];
+  analysis: string;
+  fullContent: string;
+}
+interface DebateRound {
+  round: number;
+  messages: DebateRoundMsg[];
+}
+interface DebateData {
+  symbol: string;
+  stockName: string;
+  date: string;
+  rounds: DebateRound[];
+  source: string;
+  note?: string;
+}
+
 export function Calendar({ onDateSelect }: CalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [verdicts, setVerdicts] = useState<Record<string, DailyVerdict>>({});
@@ -99,6 +120,39 @@ export function Calendar({ onDateSelect }: CalendarProps) {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [modalVerdict, setModalVerdict] = useState<DailyVerdict | null>(null);
+  // 토론 관련 상태
+  const [expandedStock, setExpandedStock] = useState<string | null>(null);
+  const [debateData, setDebateData] = useState<Record<string, DebateData>>({});
+  const [debateLoading, setDebateLoading] = useState<string | null>(null);
+  const [expandedRound, setExpandedRound] = useState<number | null>(null);
+
+  const fetchDebate = useCallback(async (symbol: string, date: string) => {
+    const key = `${symbol}-${date}`;
+    if (debateData[key]) return;
+    setDebateLoading(symbol);
+    try {
+      const res = await fetch(`/api/debate/history?symbol=${symbol}&date=${date}`);
+      const data = await res.json();
+      if (data.success && data.data) {
+        setDebateData(prev => ({ ...prev, [key]: data.data }));
+      }
+    } catch (e) {
+      console.error('debate fetch error', e);
+    } finally {
+      setDebateLoading(null);
+    }
+  }, [debateData]);
+
+  const toggleStock = (symbol: string) => {
+    if (expandedStock === symbol) {
+      setExpandedStock(null);
+      setExpandedRound(null);
+    } else {
+      setExpandedStock(symbol);
+      setExpandedRound(null);
+      if (selectedDate) fetchDebate(symbol, selectedDate);
+    }
+  };
 
   // 구독 정보
   const { planName, isPremium, isVip } = useCurrentPlan();
@@ -228,6 +282,8 @@ export function Calendar({ onDateSelect }: CalendarProps) {
   function closeDetailModal() {
     setShowDetailModal(false);
     setModalVerdict(null);
+    setExpandedStock(null);
+    setExpandedRound(null);
   }
 
   function prevMonth() {
@@ -447,7 +503,7 @@ export function Calendar({ onDateSelect }: CalendarProps) {
 
             {/* Body - Top 5 List */}
             <div className="p-4 sm:p-5 space-y-3">
-              {modalVerdict.top5.map((item, i) => {
+              {modalVerdict.top5.map((item) => {
                 const hasScores = (item.claudeScore && item.claudeScore > 0) ||
                   (item.geminiScore && item.geminiScore > 0) ||
                   (item.gptScore && item.gptScore > 0);
@@ -455,83 +511,130 @@ export function Calendar({ onDateSelect }: CalendarProps) {
                   (item.claudeScore && item.claudeScore > 0 ? 1 : 0) +
                   (item.geminiScore && item.geminiScore > 0 ? 1 : 0) +
                   (item.gptScore && item.gptScore > 0 ? 1 : 0) === 3;
+                const isExpanded = expandedStock === item.symbolCode;
+                const debateKey = `${item.symbolCode}-${selectedDate}`;
+                const stockDebate = debateData[debateKey];
+                const isLoadingThis = debateLoading === item.symbolCode;
 
                 return (
                   <div
                     key={item.symbolCode}
-                    className={`p-3 sm:p-4 rounded-xl border transition-all ${isUnanimous
-                        ? 'bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/30'
-                        : 'bg-dark-800/60 border-dark-700/50 hover:border-dark-600'
+                    className={`rounded-xl border transition-all ${isUnanimous
+                      ? 'bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/30'
+                      : 'bg-dark-800/60 border-dark-700/50 hover:border-dark-600'
                       }`}
                   >
-                    {/* Stock Header */}
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center font-bold text-sm ${getRankBadge(item.rank)}`}>
-                        {item.rank}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-bold text-dark-100 truncate text-sm sm:text-base">{item.symbolName}</p>
-                          {isUnanimous && (
-                            <span className="px-1.5 py-0.5 text-[10px] bg-amber-500/20 text-amber-400 rounded-full font-bold shrink-0">
-                              ✨ 만장일치
-                            </span>
-                          )}
+                    {/* Stock Header - 클릭하면 토론 펼침 */}
+                    <button
+                      onClick={() => toggleStock(item.symbolCode)}
+                      className="w-full p-3 sm:p-4 text-left"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 ${getRankBadge(item.rank)}`}>
+                          {item.rank}
                         </div>
-                        <p className="text-xs text-dark-500">
-                          {item.symbolCode}
-                          {item.sector && <span className="ml-1.5 text-dark-600">· {item.sector}</span>}
-                        </p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className={`text-lg sm:text-xl font-bold ${getScoreColor(item.avgScore)}`}>
-                          {item.avgScore.toFixed(1)}
-                        </div>
-                        <div className="text-2xs text-dark-600">평균점수</div>
-                      </div>
-                    </div>
-
-                    {/* AI Individual Scores */}
-                    {hasScores && (
-                      <div className="grid grid-cols-3 gap-2">
-                        {/* Claude */}
-                        <div className={`flex items-center gap-1.5 p-2 rounded-lg ${item.claudeScore && item.claudeScore > 0
-                            ? 'bg-purple-500/15 border border-purple-500/25'
-                            : 'bg-dark-800/40 border border-dark-700/30'
-                          }`}>
-                          <CharacterAvatar character="claude" size="sm" />
-                          <div className="min-w-0">
-                            <p className={`text-xs font-bold ${item.claudeScore && item.claudeScore > 0 ? 'text-purple-400' : 'text-dark-600'}`}>
-                              {item.claudeScore && item.claudeScore > 0 ? item.claudeScore.toFixed(1) : '-'}
-                            </p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-dark-100 truncate text-sm sm:text-base">{item.symbolName}</p>
+                            {isUnanimous && (
+                              <span className="px-1.5 py-0.5 text-[10px] bg-amber-500/20 text-amber-400 rounded-full font-bold shrink-0">✨ 만장일치</span>
+                            )}
                           </div>
+                          <p className="text-xs text-dark-500">
+                            {item.symbolCode}
+                            {item.sector && <span className="ml-1.5 text-dark-600">· {item.sector}</span>}
+                          </p>
                         </div>
+                        <div className="text-right shrink-0 mr-1">
+                          <div className={`text-lg font-bold ${getScoreColor(item.avgScore)}`}>{item.avgScore.toFixed(1)}</div>
+                          <div className="text-2xs text-dark-600">평균점수</div>
+                        </div>
+                        {isExpanded
+                          ? <ChevronDown className="w-4 h-4 text-brand-400 shrink-0" />
+                          : <ChevronRight className="w-4 h-4 text-dark-500 shrink-0" />
+                        }
+                      </div>
+                      {/* AI scores row */}
+                      {hasScores && (
+                        <div className="grid grid-cols-3 gap-2 mt-3">
+                          {(['claude', 'gemini', 'gpt'] as const).map(c => {
+                            const s = c === 'claude' ? item.claudeScore : c === 'gemini' ? item.geminiScore : item.gptScore;
+                            const colors = c === 'claude' ? ['purple', 'bg-purple-500/15 border-purple-500/25', 'text-purple-400'] : c === 'gemini' ? ['blue', 'bg-blue-500/15 border-blue-500/25', 'text-blue-400'] : ['emerald', 'bg-emerald-500/15 border-emerald-500/25', 'text-emerald-400'];
+                            return (
+                              <div key={c} className={`flex items-center gap-1.5 p-2 rounded-lg border ${s && s > 0 ? colors[1] : 'bg-dark-800/40 border-dark-700/30'}`}>
+                                <CharacterAvatar character={c} size="sm" />
+                                <p className={`text-xs font-bold ${s && s > 0 ? colors[2] : 'text-dark-600'}`}>{s && s > 0 ? s.toFixed(1) : '-'}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {/* 토론 보기 힌트 */}
+                      <div className="flex items-center gap-1 mt-2 text-2xs text-dark-600">
+                        <MessageCircle className="w-3 h-3" />
+                        <span>{isExpanded ? '토론 내용 접기' : '클릭하여 AI 토론 보기'}</span>
+                      </div>
+                    </button>
 
-                        {/* Gemini */}
-                        <div className={`flex items-center gap-1.5 p-2 rounded-lg ${item.geminiScore && item.geminiScore > 0
-                            ? 'bg-blue-500/15 border border-blue-500/25'
-                            : 'bg-dark-800/40 border border-dark-700/30'
-                          }`}>
-                          <CharacterAvatar character="gemini" size="sm" />
-                          <div className="min-w-0">
-                            <p className={`text-xs font-bold ${item.geminiScore && item.geminiScore > 0 ? 'text-blue-400' : 'text-dark-600'}`}>
-                              {item.geminiScore && item.geminiScore > 0 ? item.geminiScore.toFixed(1) : '-'}
-                            </p>
+                    {/* 펼쳐진 토론 내용 */}
+                    {isExpanded && (
+                      <div className="px-3 sm:px-4 pb-3 sm:pb-4 border-t border-dark-700/30">
+                        {isLoadingThis ? (
+                          <div className="flex items-center justify-center py-6 gap-2">
+                            <Loader2 className="w-4 h-4 text-brand-400 animate-spin" />
+                            <span className="text-xs text-dark-400">토론 내용 로딩 중...</span>
                           </div>
-                        </div>
-
-                        {/* GPT */}
-                        <div className={`flex items-center gap-1.5 p-2 rounded-lg ${item.gptScore && item.gptScore > 0
-                            ? 'bg-emerald-500/15 border border-emerald-500/25'
-                            : 'bg-dark-800/40 border border-dark-700/30'
-                          }`}>
-                          <CharacterAvatar character="gpt" size="sm" />
-                          <div className="min-w-0">
-                            <p className={`text-xs font-bold ${item.gptScore && item.gptScore > 0 ? 'text-emerald-400' : 'text-dark-600'}`}>
-                              {item.gptScore && item.gptScore > 0 ? item.gptScore.toFixed(1) : '-'}
-                            </p>
+                        ) : stockDebate?.rounds ? (
+                          <div className="pt-3 space-y-2">
+                            {stockDebate.note && (
+                              <p className="text-2xs text-dark-600 mb-2 italic">ℹ️ {stockDebate.note}</p>
+                            )}
+                            {stockDebate.rounds.map((round) => {
+                              const isRoundOpen = expandedRound === round.round;
+                              return (
+                                <div key={round.round} className="rounded-lg border border-dark-700/40 overflow-hidden">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setExpandedRound(isRoundOpen ? null : round.round); }}
+                                    className="w-full flex items-center justify-between p-2.5 bg-dark-800/40 hover:bg-dark-800/70 transition-colors text-left"
+                                  >
+                                    <span className="text-xs font-semibold text-dark-300">🎙️ 라운드 {round.round}</span>
+                                    {isRoundOpen ? <ChevronDown className="w-3.5 h-3.5 text-dark-500" /> : <ChevronRight className="w-3.5 h-3.5 text-dark-500" />}
+                                  </button>
+                                  {isRoundOpen && (
+                                    <div className="p-2.5 space-y-2.5">
+                                      {round.messages.map((msg, mi) => {
+                                        const charColors: Record<string, { bg: string; border: string; text: string }> = {
+                                          claude: { bg: 'bg-purple-500/10', border: 'border-purple-500/20', text: 'text-purple-400' },
+                                          gemini: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-400' },
+                                          gpt: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400' },
+                                        };
+                                        const cc = charColors[msg.character] || charColors.claude;
+                                        return (
+                                          <div key={mi} className={`p-2.5 rounded-lg ${cc.bg} border ${cc.border}`}>
+                                            <div className="flex items-center gap-2 mb-1.5">
+                                              <CharacterAvatar character={msg.character as CharacterType} size="sm" />
+                                              <span className={`text-xs font-semibold ${cc.text}`}>{msg.characterName}</span>
+                                              {msg.picked ? (
+                                                <span className="ml-auto px-1.5 py-0.5 text-[10px] bg-emerald-500/20 text-emerald-400 rounded font-bold">✅ 추천</span>
+                                              ) : (
+                                                <span className="ml-auto px-1.5 py-0.5 text-[10px] bg-dark-700/50 text-dark-500 rounded">미추천</span>
+                                              )}
+                                            </div>
+                                            <p className="text-xs text-dark-300 leading-relaxed whitespace-pre-wrap">{msg.analysis || '분석 내용 없음'}</p>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
-                        </div>
+                        ) : (
+                          <div className="text-center py-4">
+                            <p className="text-xs text-dark-500">토론 데이터가 없습니다.</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -545,10 +648,7 @@ export function Calendar({ onDateSelect }: CalendarProps) {
                     <Award className="w-3.5 h-3.5" />
                     <span>총 {modalVerdict.top5.length}개 종목 추천</span>
                   </div>
-                  <span className={`px-2 py-0.5 rounded text-2xs font-medium ${modalVerdict.isGenerated
-                      ? 'bg-emerald-500/10 text-emerald-400'
-                      : 'bg-amber-500/10 text-amber-400'
-                    }`}>
+                  <span className={`px-2 py-0.5 rounded text-2xs font-medium ${modalVerdict.isGenerated ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
                     {modalVerdict.isGenerated ? 'AI Generated' : 'Historical'}
                   </span>
                 </div>
