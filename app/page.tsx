@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { Header } from '@/components';
 import { CHARACTERS, type CharacterInfo } from '@/lib/characters';
@@ -521,7 +521,6 @@ function StockDetailModal({
 }) {
   const [debateRounds, setDebateRounds] = useState<any[]>([]);
   const [debateLoading, setDebateLoading] = useState(false);
-  const [expandedRound, setExpandedRound] = useState<number | null>(null);
 
   // 각 AI별 의견 찾기
   const claudeItem = verdict.claudeTop5?.find(c => c.symbol === stock.symbol);
@@ -735,69 +734,16 @@ function StockDetailModal({
               );
             })}
 
-            {/* 토론 라운드 */}
+            {/* 토론 라운드 - 채팅 스타일 */}
             <div className="mt-6">
-              <h3 className="text-lg font-bold text-dark-100 mb-4">🎙️ AI 토론 과정</h3>
+              <h3 className="text-base sm:text-lg font-bold text-dark-100 mb-4">🎙️ AI 토론 과정</h3>
               {debateLoading ? (
                 <div className="flex items-center justify-center py-6 gap-2">
                   <div className="w-4 h-4 border-2 border-brand-400 border-t-transparent rounded-full animate-spin" />
                   <span className="text-sm text-dark-400">토론 내용 로딩 중...</span>
                 </div>
               ) : debateRounds.length > 0 ? (
-                <div className="space-y-2">
-                  {debateRounds.map((round: any) => {
-                    const isOpen = expandedRound === round.round;
-                    return (
-                      <div key={round.round} className="rounded-xl border border-dark-700/40 overflow-hidden">
-                        <button
-                          onClick={() => setExpandedRound(isOpen ? null : round.round)}
-                          className="w-full flex items-center justify-between p-3 bg-dark-800/40 hover:bg-dark-800/70 transition-colors text-left"
-                        >
-                          <span className="text-sm font-semibold text-dark-300">
-                            🎙️ 라운드 {round.round} - {round.round === 1 ? '초기 분석' : round.round === 2 ? '의견 조율' : '최종 합의'}
-                          </span>
-                          <TrendingUp className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180 text-brand-400' : 'text-dark-500'}`} />
-                        </button>
-                        {isOpen && (
-                          <div className="p-3 space-y-3">
-                            {round.messages.map((msg: any, mi: number) => {
-                              const charColors: Record<string, { bg: string; border: string; color: string }> = {
-                                claude: { bg: 'bg-purple-500/10', border: 'border-purple-500/20', color: 'text-purple-400' },
-                                gemini: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', color: 'text-blue-400' },
-                                gpt: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', color: 'text-emerald-400' },
-                              };
-                              const cc = charColors[msg.character] || charColors.claude;
-                              const aiScore = msg.character === 'claude' ? stock.claudeScore
-                                : msg.character === 'gemini' ? stock.geminiScore : stock.gptScore;
-                              const sBadge = getScoreBadge(aiScore);
-
-                              return (
-                                <div key={mi} className={`p-3 rounded-xl ${cc.bg} border ${cc.border}`}>
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <div className={`w-8 h-8 rounded-lg overflow-hidden ring-1 ${cc.border}`}>
-                                      <Image
-                                        src={CHARACTERS[msg.character as keyof typeof CHARACTERS]?.image || ''}
-                                        alt={msg.characterName}
-                                        width={32}
-                                        height={32}
-                                        className="w-full h-full object-cover"
-                                      />
-                                    </div>
-                                    <span className={`text-sm font-semibold ${cc.color}`}>{msg.characterName}</span>
-                                    <span className={`ml-auto px-2 py-0.5 text-xs rounded-full border ${sBadge.style} ${sBadge.text} font-bold`}>
-                                      {sBadge.label}
-                                    </span>
-                                  </div>
-                                  <p className="text-sm text-dark-300 leading-relaxed whitespace-pre-wrap">{msg.analysis || '분석 내용 없음'}</p>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                <DebateChat rounds={debateRounds} stock={stock} getScoreBadge={getScoreBadge} />
               ) : (
                 <p className="text-sm text-dark-500 text-center py-4">토론 데이터를 불러올 수 없습니다.</p>
               )}
@@ -815,6 +761,201 @@ function StockDetailModal({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+// === 채팅 스타일 토론 컴포넌트 ===
+function DebateChat({ rounds, stock, getScoreBadge }: {
+  rounds: any[];
+  stock: Top5Item;
+  getScoreBadge: (score: number) => { label: string; style: string; text: string };
+}) {
+  // 모든 메시지를 순서대로 펼침 (round 정보 포함)
+  const allMessages = rounds.flatMap((round: any) =>
+    round.messages.map((msg: any, mi: number) => ({
+      ...msg,
+      roundNum: round.round,
+      roundTitle: round.round === 1 ? '초기 분석' : round.round === 2 ? '의견 조율' : '최종 합의',
+      isFirstInRound: mi === 0,
+      isLastInRound: mi === round.messages.length - 1,
+    }))
+  );
+
+  // 현재까지 보여줄 메시지 인덱스
+  const [visibleCount, setVisibleCount] = useState(0);
+  // 현재 타이핑 중인 메시지 인덱스 (-1이면 없음)
+  const [typingIndex, setTypingIndex] = useState(-1);
+  // 타이핑 중인 텍스트 길이
+  const [typedLength, setTypedLength] = useState(0);
+  // 라운드 끝에서 다음 버튼 대기 중
+  const [waitingForNext, setWaitingForNext] = useState(false);
+  // 채팅 영역 ref
+  const chatRef = useRef<HTMLDivElement>(null);
+  // 타이머 ref
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 자동 스크롤
+  useEffect(() => {
+    if (chatRef.current) {
+      chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    }
+  }, [visibleCount, typedLength, waitingForNext]);
+
+  // 첫 메시지 자동 시작
+  useEffect(() => {
+    if (allMessages.length > 0 && visibleCount === 0 && typingIndex === -1) {
+      startTyping(0);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allMessages.length]);
+
+  const startTyping = (idx: number) => {
+    if (idx >= allMessages.length) return;
+    setTypingIndex(idx);
+    setTypedLength(0);
+    setWaitingForNext(false);
+
+    const text = allMessages[idx].analysis || '분석 내용 없음';
+    let charIdx = 0;
+
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      charIdx++;
+      setTypedLength(charIdx);
+      if (charIdx >= text.length) {
+        if (timerRef.current) clearInterval(timerRef.current);
+        // 메시지 완료
+        setTypingIndex(-1);
+        setVisibleCount(idx + 1);
+
+        // 라운드의 마지막 메시지이고, 다음 라운드가 있으면 대기
+        const msg = allMessages[idx];
+        if (msg.isLastInRound && idx < allMessages.length - 1) {
+          setWaitingForNext(true);
+        } else if (idx < allMessages.length - 1) {
+          // 같은 라운드 내 다음 메시지 → 짧은 딜레이 후 자동 시작
+          setTimeout(() => startTyping(idx + 1), 600);
+        }
+      }
+    }, 18); // 타이핑 속도 (ms per char)
+  };
+
+  const handleNextRound = () => {
+    setWaitingForNext(false);
+    startTyping(visibleCount);
+  };
+
+  const charColors: Record<string, { bg: string; border: string; color: string; bubbleBg: string }> = {
+    claude: { bg: 'bg-purple-500/15', border: 'border-purple-500/30', color: 'text-purple-400', bubbleBg: 'bg-purple-500/8' },
+    gemini: { bg: 'bg-blue-500/15', border: 'border-blue-500/30', color: 'text-blue-400', bubbleBg: 'bg-blue-500/8' },
+    gpt: { bg: 'bg-emerald-500/15', border: 'border-emerald-500/30', color: 'text-emerald-400', bubbleBg: 'bg-emerald-500/8' },
+  };
+
+  return (
+    <div ref={chatRef} className="space-y-1 max-h-[50vh] overflow-y-auto scroll-smooth pr-1">
+      {/* 완료된 메시지 */}
+      {allMessages.slice(0, visibleCount).map((msg: any, i: number) => {
+        const cc = charColors[msg.character] || charColors.claude;
+        const char = CHARACTERS[msg.character as keyof typeof CHARACTERS];
+
+        return (
+          <div key={i}>
+            {/* 라운드 구분선 */}
+            {msg.isFirstInRound && (
+              <div className="flex items-center gap-3 py-3">
+                <div className="flex-1 h-px bg-dark-700/50" />
+                <span className="text-[11px] text-dark-500 font-medium px-2 py-0.5 rounded-full bg-dark-800/60 border border-dark-700/40 whitespace-nowrap">
+                  🎙️ {msg.roundTitle}
+                </span>
+                <div className="flex-1 h-px bg-dark-700/50" />
+              </div>
+            )}
+            {/* 채팅 버블 */}
+            <div className="flex items-start gap-2.5 py-1.5">
+              <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg overflow-hidden ring-1 ${cc.border} shrink-0 mt-0.5`}>
+                <Image src={char?.image || ''} alt={msg.characterName} width={36} height={36} className="w-full h-full object-cover" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className={`text-xs sm:text-sm font-bold ${cc.color}`}>{msg.characterName}</span>
+                  <span className="text-[10px] text-dark-600">·</span>
+                  <span className="text-[10px] text-dark-600">{msg.roundTitle}</span>
+                </div>
+                <div className={`rounded-2xl rounded-tl-md px-3 sm:px-4 py-2.5 sm:py-3 ${cc.bubbleBg} border ${cc.border}`}>
+                  <p className="text-[13px] sm:text-sm text-dark-200 leading-relaxed">{msg.analysis || '분석 내용 없음'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      {/* 현재 타이핑 중인 메시지 */}
+      {typingIndex >= 0 && typingIndex < allMessages.length && (() => {
+        const msg = allMessages[typingIndex];
+        const cc = charColors[msg.character] || charColors.claude;
+        const char = CHARACTERS[msg.character as keyof typeof CHARACTERS];
+        const fullText = msg.analysis || '분석 내용 없음';
+        const displayText = fullText.substring(0, typedLength);
+
+        return (
+          <div>
+            {msg.isFirstInRound && (
+              <div className="flex items-center gap-3 py-3">
+                <div className="flex-1 h-px bg-dark-700/50" />
+                <span className="text-[11px] text-dark-500 font-medium px-2 py-0.5 rounded-full bg-dark-800/60 border border-dark-700/40 whitespace-nowrap">
+                  🎙️ {msg.roundTitle}
+                </span>
+                <div className="flex-1 h-px bg-dark-700/50" />
+              </div>
+            )}
+            <div className="flex items-start gap-2.5 py-1.5">
+              <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg overflow-hidden ring-1 ${cc.border} shrink-0 mt-0.5`}>
+                <Image src={char?.image || ''} alt={msg.characterName} width={36} height={36} className="w-full h-full object-cover" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className={`text-xs sm:text-sm font-bold ${cc.color}`}>{msg.characterName}</span>
+                  <span className="text-[10px] text-dark-600">·</span>
+                  <span className="text-[10px] text-dark-600">{msg.roundTitle}</span>
+                </div>
+                <div className={`rounded-2xl rounded-tl-md px-3 sm:px-4 py-2.5 sm:py-3 ${cc.bubbleBg} border ${cc.border}`}>
+                  <p className="text-[13px] sm:text-sm text-dark-200 leading-relaxed">
+                    {displayText}
+                    <span className="inline-block w-0.5 h-4 bg-current ml-0.5 animate-pulse" />
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 다음 라운드 버튼 */}
+      {waitingForNext && (
+        <div className="flex justify-center py-3">
+          <button
+            onClick={handleNextRound}
+            className="px-5 py-2.5 rounded-xl bg-brand-500/20 border border-brand-500/40 text-brand-400 text-sm font-semibold hover:bg-brand-500/30 transition-all active:scale-95"
+          >
+            다음 대화 보기 →
+          </button>
+        </div>
+      )}
+
+      {/* 토론 완료 */}
+      {visibleCount >= allMessages.length && typingIndex === -1 && !waitingForNext && visibleCount > 0 && (
+        <div className="flex items-center gap-3 py-3">
+          <div className="flex-1 h-px bg-brand-500/30" />
+          <span className="text-[11px] text-brand-400 font-medium px-3 py-1 rounded-full bg-brand-500/10 border border-brand-500/30">
+            ✅ 토론 완료
+          </span>
+          <div className="flex-1 h-px bg-brand-500/30" />
+        </div>
+      )}
     </div>
   );
 }
