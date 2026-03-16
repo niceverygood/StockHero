@@ -857,7 +857,7 @@ function DebateChat({ rounds, stock, getScoreBadge }: {
           setTimeout(() => startTyping(idx + 1), 600);
         }
       }
-    }, 18); // 타이핑 속도 (ms per char)
+    }, 8); // 타이핑 속도 (ms per char - 빠르게)
   };
 
   const handleNextRound = () => {
