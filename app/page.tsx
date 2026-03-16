@@ -157,6 +157,14 @@ export default function HomePage() {
     return 'bg-dark-700 text-dark-300';
   };
 
+  // 투자 판정 함수
+  const getInvestmentVerdict = (weightedScore: number) => {
+    if (weightedScore >= 3.5) return { label: '적극 매수', emoji: '🟢', color: 'text-emerald-400', bg: 'bg-emerald-500/15 border-emerald-500/30' };
+    if (weightedScore >= 2.5) return { label: '분할 매수', emoji: '🔵', color: 'text-blue-400', bg: 'bg-blue-500/15 border-blue-500/30' };
+    if (weightedScore >= 1.5) return { label: '관망', emoji: '🟡', color: 'text-yellow-400', bg: 'bg-yellow-500/15 border-yellow-500/30' };
+    return { label: '매수 금지', emoji: '🔴', color: 'text-red-400', bg: 'bg-red-500/15 border-red-500/30' };
+  };
+
   return (
     <>
       <Header />
@@ -365,27 +373,30 @@ export default function HomePage() {
                             {stock.avgScore.toFixed(1)}
                           </p>
                         </div>
-                        {marketBuyWeight !== null && (
-                          <>
-                            <div className="w-px h-8 sm:h-10 bg-dark-700" />
-                            <div
-                              className="text-center cursor-help"
-                              title={`평균 ${stock.avgScore.toFixed(1)} × ${(marketBuyWeight * 100).toFixed(0)}% = ${(stock.avgScore * marketBuyWeight).toFixed(1)}`}
-                            >
-                              <p className="text-[9px] sm:text-[10px] text-brand-400/70 mb-0.5 whitespace-nowrap">가중 매수</p>
-                              <p className={`text-base sm:text-lg font-black ${(() => {
-                                const w = stock.avgScore * marketBuyWeight;
-                                if (w >= 3.5) return 'text-emerald-400';
-                                if (w >= 2.5) return 'text-yellow-400';
-                                if (w >= 1.5) return 'text-orange-400';
-                                return 'text-red-400';
-                              })()}`}>
-                                {(stock.avgScore * marketBuyWeight).toFixed(1)}
-                              </p>
-                              <p className="text-[8px] sm:text-[9px] text-dark-600">×{(marketBuyWeight * 100).toFixed(0)}%</p>
-                            </div>
-                          </>
-                        )}
+                        {marketBuyWeight !== null && (() => {
+                          const wScore = stock.avgScore * marketBuyWeight;
+                          const verdict = getInvestmentVerdict(wScore);
+                          return (
+                            <>
+                              <div className="w-px h-8 sm:h-10 bg-dark-700" />
+                              <div
+                                className="text-center cursor-help"
+                                title={`평균 ${stock.avgScore.toFixed(1)} × ${(marketBuyWeight * 100).toFixed(0)}% = ${wScore.toFixed(1)} → ${verdict.label}`}
+                              >
+                                <p className="text-[9px] sm:text-[10px] text-brand-400/70 mb-0.5 whitespace-nowrap">가중 매수</p>
+                                <p className={`text-base sm:text-lg font-black ${(() => {
+                                  if (wScore >= 3.5) return 'text-emerald-400';
+                                  if (wScore >= 2.5) return 'text-yellow-400';
+                                  if (wScore >= 1.5) return 'text-orange-400';
+                                  return 'text-red-400';
+                                })()}`}>
+                                  {wScore.toFixed(1)}
+                                </p>
+                                <p className={`text-[8px] sm:text-[9px] font-bold mt-0.5 ${verdict.color}`}>{verdict.emoji} {verdict.label}</p>
+                              </div>
+                            </>
+                          );
+                        })()}
                         {/* Click indicator - only on desktop */}
                         <div className="hidden sm:block opacity-0 group-hover:opacity-100 transition-opacity">
                           <TrendingUp className="w-5 h-5 text-brand-400" />
@@ -751,12 +762,18 @@ function StockDetailModal({
 
             {/* 추가 정보 */}
             <div className="mt-6 p-4 rounded-xl bg-dark-800/50 border border-dark-700">
-              <h4 className="text-sm font-medium text-dark-400 mb-2">📊 점수 산정 기준</h4>
-              <p className="text-dark-500 text-sm leading-relaxed">
+              <h4 className="text-sm font-medium text-dark-400 mb-2">📊 점수 산정 & 투자 판정 기준</h4>
+              <p className="text-dark-500 text-sm leading-relaxed mb-3">
                 각 AI가 해당 종목을 Top 5에 선정하면 순위에 따라 5.0~1.0점이 부여됩니다.
-                3점 이상은 적극 추천, 1~2점은 하위 순위(소극적 포함), 0점은 해당 AI가 다른 종목을 추천한 것입니다.
-                최종 순위는 3개 AI 점수의 합산으로 결정됩니다.
+                3점 이상은 적극 추천, 1~2점은 하위 순위, 0점은 미선정입니다.
+                가중 매수 점수 = AI 평균 점수 × 시장 보정 계수.
               </p>
+              <div className="flex flex-wrap gap-1.5">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">🟢 3.5+ 적극 매수</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">🔵 2.5+ 분할 매수</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">🟡 1.5+ 관망</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">🔴 1.5↓ 매수 금지</span>
+              </div>
             </div>
           </div>
         </div>

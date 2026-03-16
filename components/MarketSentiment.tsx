@@ -283,21 +283,38 @@ export function MarketSentiment() {
                 </div>
 
                 {/* AI 추천 보정 수치 */}
-                <div className="grid grid-cols-2 gap-2.5 mb-2">
+                <div className="grid grid-cols-2 gap-2.5 mb-3">
                     <Tooltip text="AI가 5점(1위)을 준 종목의 현재 시장 상황 반영 매수 강도입니다. 시장 과열 시 5점이어도 매수 강도가 낮아집니다.">
                         <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-3 text-center cursor-help w-full">
                             <p className="text-[10px] text-blue-300/70 mb-0.5">AI 5점 종목 → 매수 강도</p>
                             <p className="text-lg font-black text-blue-400">{adjustment.example5pt}<span className="text-xs font-normal text-blue-400/60">/5.0</span></p>
-                            <p className="text-[10px] text-dark-600 mt-0.5">매수 비중 ×{(adjustment.buyWeight * 100).toFixed(0)}%</p>
+                            {(() => {
+                                const w = parseFloat(adjustment.example5pt);
+                                const v = w >= 3.5 ? { l: '적극 매수', c: 'text-emerald-400' } : w >= 2.5 ? { l: '분할 매수', c: 'text-blue-400' } : w >= 1.5 ? { l: '관망', c: 'text-yellow-400' } : { l: '매수 금지', c: 'text-red-400' };
+                                return <p className={`text-[10px] font-bold mt-0.5 ${v.c}`}>{v.l}</p>;
+                            })()}
                         </div>
                     </Tooltip>
                     <Tooltip text="AI가 3점(3위)을 준 종목의 현재 시장 상황 반영 매수 강도입니다. 시장 공포 시에는 3점 종목도 좋은 매수 기회가 됩니다.">
                         <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-center cursor-help w-full">
                             <p className="text-[10px] text-red-300/70 mb-0.5">AI 3점 종목 → 매수 강도</p>
                             <p className="text-lg font-black text-red-400">{adjustment.example3pt}<span className="text-xs font-normal text-red-400/60">/3.0</span></p>
-                            <p className="text-[10px] text-dark-600 mt-0.5">매도 비중 ×{(adjustment.sellWeight * 100).toFixed(0)}%</p>
+                            {(() => {
+                                const w = parseFloat(adjustment.example3pt);
+                                const v = w >= 3.5 ? { l: '적극 매수', c: 'text-emerald-400' } : w >= 2.5 ? { l: '분할 매수', c: 'text-blue-400' } : w >= 1.5 ? { l: '관망', c: 'text-yellow-400' } : { l: '매수 금지', c: 'text-red-400' };
+                                return <p className={`text-[10px] font-bold mt-0.5 ${v.c}`}>{v.l}</p>;
+                            })()}
                         </div>
                     </Tooltip>
+                </div>
+
+                {/* 투자 판정 기준표 */}
+                <div className="flex items-center justify-center gap-2 flex-wrap">
+                    <span className="text-[9px] text-dark-600">판정 기준:</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">🟢 3.5+ 적극 매수</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">🔵 2.5+ 분할 매수</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">🟡 1.5+ 관망</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">🔴 1.5↓ 매수 금지</span>
                 </div>
             </div>
 
