@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Header } from '@/components';
 import { CHARACTERS, type CharacterInfo } from '@/lib/characters';
@@ -64,6 +64,44 @@ export default function HomePage() {
   const [showCharacterModal, setShowCharacterModal] = useState(false);
   const [selectedStock, setSelectedStock] = useState<Top5Item | null>(null);
   const [showStockModal, setShowStockModal] = useState(false);
+
+  // 모달 열기/닫기 with history (안드로이드 뒤로가기 지원)
+  const openStockModal = useCallback((stock: Top5Item) => {
+    setSelectedStock(stock);
+    setShowStockModal(true);
+    window.history.pushState({ modal: 'stock' }, '');
+  }, []);
+
+  const closeStockModal = useCallback(() => {
+    setShowStockModal(false);
+    setSelectedStock(null);
+  }, []);
+
+  const openCharacterModal = useCallback((char: CharacterInfo) => {
+    setSelectedCharacter(char);
+    setShowCharacterModal(true);
+    window.history.pushState({ modal: 'character' }, '');
+  }, []);
+
+  const closeCharacterModal = useCallback(() => {
+    setShowCharacterModal(false);
+    setSelectedCharacter(null);
+  }, []);
+
+  // 안드로이드 뒤로가기 핸들러
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (showStockModal) {
+        setShowStockModal(false);
+        setSelectedStock(null);
+      } else if (showCharacterModal) {
+        setShowCharacterModal(false);
+        setSelectedCharacter(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [showStockModal, showCharacterModal]);
   const [marketBuyWeight, setMarketBuyWeight] = useState<number | null>(null);
   const [marketScore, setMarketScore] = useState<number | null>(null);
 
@@ -155,10 +193,7 @@ export default function HomePage() {
                 return (
                   <button
                     key={charId}
-                    onClick={() => {
-                      setSelectedCharacter(char);
-                      setShowCharacterModal(true);
-                    }}
+                    onClick={() => openCharacterModal(char)}
                     className={`relative group p-4 rounded-2xl border ${char.borderColor} ${char.bgColor} hover:scale-[1.02] transition-all text-left`}
                   >
                     {/* Character Avatar & Info */}
@@ -280,85 +315,81 @@ export default function HomePage() {
                 {verdict.top5.map((stock, index) => (
                   <button
                     key={stock.symbol}
-                    onClick={() => {
-                      setSelectedStock(stock);
-                      setShowStockModal(true);
-                    }}
-                    className="w-full bg-dark-900/80 border border-dark-800 rounded-2xl p-5 hover:border-brand-500/50 hover:bg-dark-800/80 transition-all group text-left"
+                    onClick={() => openStockModal(stock)}
+                    className="w-full bg-dark-900/80 border border-dark-800 rounded-2xl p-4 sm:p-5 hover:border-brand-500/50 hover:bg-dark-800/80 transition-all group text-left"
                   >
-                    <div className="flex items-center gap-4">
-                      {/* Rank */}
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg ${getRankStyle(stock.rank)}`}>
-                        {stock.rank}
-                      </div>
-
-                      {/* Stock Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="text-lg font-bold text-dark-50 truncate">{stock.name}</h3>
-                          {stock.isUnanimous && (
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                              만장일치
-                            </span>
-                          )}
+                    {/* 모바일: 2줄 레이아웃, PC: 1줄 */}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                      {/* Row 1: 랭크 + 종목명 + 뱃지 */}
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center font-bold text-base sm:text-lg shrink-0 ${getRankStyle(stock.rank)}`}>
+                          {stock.rank}
                         </div>
-                        <p className="text-sm text-dark-500">{stock.symbol}</p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-base sm:text-lg font-bold text-dark-50 truncate">{stock.name}</h3>
+                            {stock.isUnanimous && (
+                              <span className="px-1.5 py-0.5 text-[10px] sm:text-xs rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0 whitespace-nowrap">
+                                만장일치
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs sm:text-sm text-dark-500">{stock.symbol}</p>
+                        </div>
                       </div>
 
-                      {/* Scores */}
-                      <div className="flex items-center gap-3">
-                        <div className="text-center">
-                          <p className="text-xs text-dark-500 mb-1">Claude</p>
-                          <p className={`text-sm font-bold ${stock.claudeScore > 0 ? getScoreColor(stock.claudeScore) : 'text-dark-600'}`}>
+                      {/* Row 2: Scores */}
+                      <div className="flex items-center gap-2 sm:gap-3 ml-[52px] sm:ml-0">
+                        <div className="text-center min-w-[36px]">
+                          <p className="text-[10px] sm:text-xs text-dark-500 mb-0.5">Claude</p>
+                          <p className={`text-xs sm:text-sm font-bold ${stock.claudeScore > 0 ? getScoreColor(stock.claudeScore) : 'text-dark-600'}`}>
                             {stock.claudeScore > 0 ? stock.claudeScore.toFixed(1) : '-'}
                           </p>
                         </div>
-                        <div className="text-center">
-                          <p className="text-xs text-dark-500 mb-1">Gemini</p>
-                          <p className={`text-sm font-bold ${stock.geminiScore > 0 ? getScoreColor(stock.geminiScore) : 'text-dark-600'}`}>
+                        <div className="text-center min-w-[36px]">
+                          <p className="text-[10px] sm:text-xs text-dark-500 mb-0.5">Gemini</p>
+                          <p className={`text-xs sm:text-sm font-bold ${stock.geminiScore > 0 ? getScoreColor(stock.geminiScore) : 'text-dark-600'}`}>
                             {stock.geminiScore > 0 ? stock.geminiScore.toFixed(1) : '-'}
                           </p>
                         </div>
-                        <div className="text-center">
-                          <p className="text-xs text-dark-500 mb-1">GPT</p>
-                          <p className={`text-sm font-bold ${stock.gptScore > 0 ? getScoreColor(stock.gptScore) : 'text-dark-600'}`}>
+                        <div className="text-center min-w-[36px]">
+                          <p className="text-[10px] sm:text-xs text-dark-500 mb-0.5">GPT</p>
+                          <p className={`text-xs sm:text-sm font-bold ${stock.gptScore > 0 ? getScoreColor(stock.gptScore) : 'text-dark-600'}`}>
                             {stock.gptScore > 0 ? stock.gptScore.toFixed(1) : '-'}
                           </p>
                         </div>
-                        <div className="w-px h-10 bg-dark-700 mx-1" />
-                        <div className="text-center" title="3개 AI(Claude, Gemini, GPT)의 추천 점수 평균입니다. 5점=1위, 4점=2위, 3점=3위 순으로 부여됩니다.">
-                          <p className="text-xs text-dark-500 mb-1">평균</p>
-                          <p className={`text-lg font-bold ${getScoreColor(stock.avgScore)}`}>
+                        <div className="w-px h-8 sm:h-10 bg-dark-700" />
+                        <div className="text-center" title="3개 AI의 추천 점수 평균">
+                          <p className="text-[10px] sm:text-xs text-dark-500 mb-0.5">평균</p>
+                          <p className={`text-base sm:text-lg font-bold ${getScoreColor(stock.avgScore)}`}>
                             {stock.avgScore.toFixed(1)}
                           </p>
                         </div>
                         {marketBuyWeight !== null && (
                           <>
-                            <div className="w-px h-10 bg-dark-700 mx-1" />
+                            <div className="w-px h-8 sm:h-10 bg-dark-700" />
                             <div
-                              className="text-center min-w-[52px] cursor-help"
-                              title={`시장 타이밍 보정 점수: 평균 ${stock.avgScore.toFixed(1)} × 매수비중 ${(marketBuyWeight * 100).toFixed(0)}% = ${(stock.avgScore * marketBuyWeight).toFixed(1)}. 시장 과열 시 매수 강도가 줄고, 공포 시 매수 강도가 높아집니다. (현재 시장점수: ${marketScore}/100)`}
+                              className="text-center cursor-help"
+                              title={`평균 ${stock.avgScore.toFixed(1)} × ${(marketBuyWeight * 100).toFixed(0)}% = ${(stock.avgScore * marketBuyWeight).toFixed(1)}`}
                             >
-                              <p className="text-[10px] text-brand-400/70 mb-1 whitespace-nowrap">가중 매수</p>
-                              <p className={`text-lg font-black ${(() => {
+                              <p className="text-[9px] sm:text-[10px] text-brand-400/70 mb-0.5 whitespace-nowrap">가중 매수</p>
+                              <p className={`text-base sm:text-lg font-black ${(() => {
                                 const w = stock.avgScore * marketBuyWeight;
                                 if (w >= 3.5) return 'text-emerald-400';
                                 if (w >= 2.5) return 'text-yellow-400';
                                 if (w >= 1.5) return 'text-orange-400';
                                 return 'text-red-400';
-                              })()
-                                }`}>
+                              })()}`}>
                                 {(stock.avgScore * marketBuyWeight).toFixed(1)}
                               </p>
-                              <p className="text-[9px] text-dark-600">×{(marketBuyWeight * 100).toFixed(0)}%</p>
+                              <p className="text-[8px] sm:text-[9px] text-dark-600">×{(marketBuyWeight * 100).toFixed(0)}%</p>
                             </div>
                           </>
                         )}
-                      </div>
-
-                      {/* Click indicator */}
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        <TrendingUp className="w-5 h-5 text-brand-400" />
+                        {/* Click indicator - only on desktop */}
+                        <div className="hidden sm:block opacity-0 group-hover:opacity-100 transition-opacity">
+                          <TrendingUp className="w-5 h-5 text-brand-400" />
+                        </div>
                       </div>
                     </div>
                   </button>
@@ -462,7 +493,7 @@ export default function HomePage() {
         <CharacterDetailModal
           character={selectedCharacter}
           isOpen={showCharacterModal}
-          onClose={() => setShowCharacterModal(false)}
+          onClose={closeCharacterModal}
         />
       )}
 
@@ -471,10 +502,7 @@ export default function HomePage() {
         <StockDetailModal
           stock={selectedStock}
           verdict={verdict}
-          onClose={() => {
-            setShowStockModal(false);
-            setSelectedStock(null);
-          }}
+          onClose={closeStockModal}
         />
       )}
     </>
@@ -594,82 +622,93 @@ function StockDetailModal({
     return { label: '미선정', style: 'bg-dark-700 border-dark-600', text: 'text-dark-400' };
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-dark-950/90 backdrop-blur-sm" onClick={onClose} />
+  // 모달 닫을 때 history.back()도 호출
+  const handleClose = useCallback(() => {
+    onClose();
+    // popstate에서 이미 닫힌 경우가 아닌 경우에만 back
+    if (window.history.state?.modal) {
+      window.history.back();
+    }
+  }, [onClose]);
 
-      {/* Modal */}
-      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-hidden rounded-2xl bg-dark-900 border border-dark-700 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-        <div className="max-h-[90vh] overflow-y-auto">
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-dark-950/90 backdrop-blur-sm" onClick={handleClose} />
+
+      {/* Modal - 모바일에서는 풀스크린에 가깝게 */}
+      <div className="relative w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden rounded-t-2xl sm:rounded-2xl bg-dark-900 border border-dark-700 shadow-2xl animate-in fade-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200">
+        <div className="max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
           {/* Header */}
-          <div className="sticky top-0 z-10 bg-dark-900 border-b border-dark-800 p-6">
+          <div className="sticky top-0 z-10 bg-dark-900 border-b border-dark-800 p-4 sm:p-6">
             <button
-              onClick={onClose}
-              className="absolute top-4 right-4 p-2 rounded-full bg-dark-800/80 hover:bg-dark-700 transition-colors"
+              onClick={handleClose}
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 p-2 rounded-full bg-dark-800/80 hover:bg-dark-700 transition-colors z-10"
             >
               <X className="w-5 h-5 text-dark-400" />
             </button>
 
-            <div className="flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-xl flex items-center justify-center font-bold text-xl ${stock.rank === 1 ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-black' :
+            <div className="flex items-center gap-3 sm:gap-4 pr-10">
+              <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center font-bold text-lg sm:text-xl shrink-0 ${stock.rank === 1 ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-black' :
                 stock.rank === 2 ? 'bg-gradient-to-r from-slate-400 to-slate-300 text-black' :
                   stock.rank === 3 ? 'bg-gradient-to-r from-amber-700 to-amber-600 text-white' :
                     'bg-dark-700 text-dark-300'
                 }`}>
                 {stock.rank}
               </div>
-              <div>
-                <h2 className="text-2xl font-bold text-dark-50">{stock.name}</h2>
-                <p className="text-dark-400">{stock.symbol}</p>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl sm:text-2xl font-bold text-dark-50 truncate">{stock.name}</h2>
+                <p className="text-dark-400 text-sm">{stock.symbol}</p>
               </div>
-              <div className="ml-auto text-right">
-                <p className="text-sm text-dark-500">평균 점수</p>
-                <p className={`text-3xl font-bold ${getScoreColor(stock.avgScore)}`}>
+              <div className="text-right shrink-0">
+                <p className="text-xs sm:text-sm text-dark-500">평균 점수</p>
+                <p className={`text-2xl sm:text-3xl font-bold ${getScoreColor(stock.avgScore)}`}>
                   {stock.avgScore.toFixed(1)}
                 </p>
               </div>
             </div>
 
             {/* 만장일치 여부 */}
-            <div className="mt-4">
+            <div className="mt-3 sm:mt-4">
               {stock.isUnanimous ? (
-                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/30">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  <span className="text-emerald-400 font-medium">만장일치!</span>
-                  <span className="text-emerald-300/70 text-sm">3명의 AI 모두 이 종목을 Top 5에 선정했습니다</span>
+                <div className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/30">
+                  <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400 shrink-0" />
+                  <span className="text-emerald-400 font-medium text-sm whitespace-nowrap">만장일치!</span>
+                  <span className="text-emerald-300/70 text-xs sm:text-sm">3명의 AI 모두 이 종목을 Top 5에 선정했습니다</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/20 border border-amber-500/30">
-                  <AlertCircle className="w-5 h-5 text-amber-400" />
-                  <span className="text-amber-400 font-medium">의견 차이</span>
-                  <span className="text-amber-300/70 text-sm">
-                    {aiAnalysis.filter(a => a.score < 3).map(a => a.name).join(', ')}은(는) 다른 종목을 더 선호했습니다
-                  </span>
+                <div className="flex items-start sm:items-center gap-2 px-3 sm:px-4 py-2 rounded-xl bg-amber-500/20 border border-amber-500/30">
+                  <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
+                  <div className="flex flex-wrap items-center gap-1">
+                    <span className="text-amber-400 font-medium text-sm whitespace-nowrap">의견 차이</span>
+                    <span className="text-amber-300/70 text-xs sm:text-sm">
+                      {aiAnalysis.filter(a => a.score < 3).map(a => a.name).join(', ')}은(는) 다른 종목을 더 선호했습니다
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
           </div>
 
           {/* AI 의견 목록 */}
-          <div className="p-6 space-y-4">
-            <h3 className="text-lg font-bold text-dark-100 mb-4">🤖 각 AI의 분석 의견</h3>
+          <div className="p-4 sm:p-6 space-y-3 sm:space-y-4">
+            <h3 className="text-base sm:text-lg font-bold text-dark-100 mb-3 sm:mb-4">🤖 각 AI의 분석 의견</h3>
 
             {aiAnalysis.map((ai) => {
               const badge = getScoreBadge(ai.score);
               return (
                 <div
                   key={ai.id}
-                  className={`p-5 rounded-2xl border ${ai.score >= 3
+                  className={`p-4 sm:p-5 rounded-2xl border ${ai.score >= 3
                     ? `${ai.character.bgColor} ${ai.character.borderColor}`
                     : ai.score >= 1
                       ? 'bg-amber-500/5 border-amber-500/20'
                       : 'bg-dark-800/50 border-dark-700'
                     }`}
                 >
-                  <div className="flex items-start gap-4">
+                  <div className="flex items-start gap-3 sm:gap-4">
                     {/* AI 아바타 */}
-                    <div className={`w-12 h-12 rounded-xl overflow-hidden ring-2 ${ai.character.borderColor} flex-shrink-0`}>
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden ring-2 ${ai.character.borderColor} flex-shrink-0`}>
                       <Image
                         src={ai.character.image}
                         alt={ai.name}
@@ -681,17 +720,15 @@ function StockDetailModal({
 
                     {/* 의견 */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className={`font-bold ${ai.character.color}`}>{ai.name}</span>
-                          <span className="text-dark-500 text-sm">{ai.character.roleKo}</span>
-                        </div>
-                        <span className={`px-3 py-1 rounded-full text-sm font-bold border ${badge.style} ${badge.text}`}>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
+                        <span className={`font-bold text-sm sm:text-base ${ai.character.color} whitespace-nowrap`}>{ai.name}</span>
+                        <span className="text-dark-500 text-xs sm:text-sm whitespace-nowrap">{ai.character.roleKo}</span>
+                        <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-bold border whitespace-nowrap ${badge.style} ${badge.text}`}>
                           {badge.label}
                         </span>
                       </div>
 
-                      <p className="text-dark-300 leading-relaxed">{ai.reason}</p>
+                      <p className="text-dark-300 text-sm sm:text-base leading-relaxed">{ai.reason}</p>
                     </div>
                   </div>
                 </div>
